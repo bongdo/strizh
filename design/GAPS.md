@@ -235,12 +235,12 @@ parse/sema pass. It generates Go in memory, loads it through `go/packages` with
 an overlay, and maps Go diagnostics back through `//line`; `strizh check` exits
 1 on `var n = 1 + "x";`. The LSP runs the same check on `initialize`,
 `didOpen` and `didSave` and publishes diagnostics with source `strizh`.
-**Границы:** `build/run/test` still rely on `go build` for type errors; test
-files (`zz_strizh_test.go`) are not checked; diagnostics have no columns (G34);
-the LSP call is synchronous (G43). [`TYPECHECK.md`](TYPECHECK.md) is the
-detailed contract.
-**Остаток:** async/debounce (G43), columns (G34), test packages, and
-per-package cache.
+**Границы:** `build/run/test` still rely on `go build` for type errors; the
+LSP checks production packages only; diagnostics have no columns (G34); the
+LSP call is synchronous (G43). [`TYPECHECK.md`](TYPECHECK.md) is the detailed
+contract.
+**Остаток:** async/debounce (G43), columns (G34), test diagnostics in the LSP,
+and per-package cache.
 
 ### G27. Interface conformance — fixed in 0.2
 **Сейчас:** sema computes method sets for local structs, local interfaces and

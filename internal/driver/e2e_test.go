@@ -97,6 +97,45 @@ func TestCheckTypeErrors(t *testing.T) {
 	}
 }
 
+func TestCheckTestTypeErrors(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "strizh.toml"), []byte("name = \"tc\"\nmodule = \"example.com/tc\"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "go.mod"), []byte("module example.com/tc\n\ngo 1.27\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(dir, "lib"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	main := "test \"root\" {\n    assert(true);\n};\n\nfn main() void = {\n    assert(true);\n};\n"
+	if err := os.WriteFile(filepath.Join(dir, "main.str"), []byte(main), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	lib := "test \"bad\" {\n    var x = 1 + \"s\";\n    assert(x == true);\n};\n"
+	libPath := filepath.Join(dir, "lib", "lib.str")
+	if err := os.WriteFile(libPath, []byte(lib), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	p, err := Open(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := p.Check(CheckOptions{Typecheck: true}); err != nil {
+		t.Fatal(err)
+	}
+	if len(p.Errors) != 1 {
+		t.Fatalf("errors: %+v", p.Errors)
+	}
+	got := p.Errors[0]
+	if got.Path != libPath || !strings.Contains(got.Msg, "mismatched types") || got.Pos.Line != 2 {
+		t.Fatalf("error: %+v", got)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "lib", "zz_strizh_test.go")); !os.IsNotExist(err) {
+		t.Fatal("zz_strizh_test.go was written to the source tree")
+	}
+}
+
 func TestConformanceCases(t *testing.T) {
 	base := filepath.Join("..", "..", "tests", "cases")
 	entries, err := os.ReadDir(base)

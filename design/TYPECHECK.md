@@ -1,7 +1,7 @@
 # Type-checking generated Go (G26)
 
-Status: prototype works for `strizh check` and LSP diagnostics. It is not
-async and does not check test packages.
+Status: prototype works for `strizh check` and LSP diagnostics. `strizh check`
+also type-checks generated test packages (`test` blocks). It is not async.
 
 ## What runs
 
@@ -10,6 +10,8 @@ memory with `internal/gen` (same generator as the build), and loads the result
 with `golang.org/x/tools/go/packages`. Nothing is written to the source tree:
 
 - every generated `zz_strizh.go` path is passed to `packages.Config.Overlay`;
+- `strizh check` also generates and overlays `zz_strizh_test.go`, and sets
+  `packages.Config.Tests` so the compiler checks the test variants;
 - the embedded runtime is overlaid at `<module>/.strizh/runtime/runtime.go`;
 - the packages are loaded from the real module root, so `go.mod`, `go.sum`
   and the module cache resolve imports normally;
@@ -73,8 +75,8 @@ cache makes repeated opens and saves free.
   code that is not covered by a `//line` directive becomes a project-level
   error. If the package also has a `.str` parse/sema error, that unmapped
   project-level error can be dropped while the source error is reported.
-- Test code (`zz_strizh_test.go`) is not type-checked; `strizh test` still
-  finds its errors through `go test`.
+- The LSP still type-checks production packages only; `test` blocks are
+  reported by `strizh check` and by `strizh test` through `go test`.
 - External Go imports must already be present in `go.mod`/`go.sum`. The LSP
   does not run `go mod tidy`.
 - The cache key does not include dependency sources, hand-written `.go` files
@@ -90,8 +92,7 @@ cache makes repeated opens and saves free.
 2. Cache per package instead of per project, so editing one package does not
    reload unrelated ones.
 3. Add columns to `//line` (G34) so diagnostics underline the expression.
-4. Reuse the same diagnostics in `strizh test` for test files.
-5. Feed Go results into hover/definition (G41) now that `packages.Load` is
+4. Feed Go results into hover/definition (G41) now that `packages.Load` is
    already set up.
 
 ## Verification
@@ -99,6 +100,9 @@ cache makes repeated opens and saves free.
 - `internal/driver` test `TestCheckTypeErrors`: a type error in a local
   package is reported at `lib/lib.str:2`, and no `zz_strizh.go` is written to
   the source tree.
+- `internal/driver` test `TestCheckTestTypeErrors`: a type error in a `test`
+  block of a nested package is reported at `lib/lib.str:2`, and no
+  `zz_strizh_test.go` is written to the source tree.
 - `internal/lsp` test `TestTypeDiagnostics`: `int + "x"` is published on
   `didOpen`, cleared on `didChange`, and published again from cache on
   `didSave`.

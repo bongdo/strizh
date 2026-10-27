@@ -167,7 +167,7 @@ func (p *Project) Check(opt CheckOptions) error {
 		return err
 	}
 	if opt.Typecheck && len(p.Errors) == 0 {
-		for _, e := range typecheck.Check(p.Program, p.Parsed, typecheck.Options{Root: p.Root, Module: p.Module}) {
+		for _, e := range typecheck.Check(p.Program, p.Parsed, typecheck.Options{Root: p.Root, Module: p.Module, Tests: true}) {
 			p.Errors = append(p.Errors, Error{Path: e.Path, Pos: e.Pos, Msg: e.Msg})
 		}
 	}
