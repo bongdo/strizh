@@ -205,7 +205,9 @@ captured value struct (`c.M()`, implicit `&c`) is also a write to `c`.
   are only checked for disjoint iteration slots and remain in the static
   limit.
 - Map writes are rejected even for disjoint keys; use a slice indexed by the
-  iteration variable, or `sync`/`atomic`.
+  iteration variable. `sync`/`atomic` are an explicit trust boundary outside
+  this static analysis: the checker does not model their happens-before. Use
+  `go build -race` for that path.
 - No dynamic checks in the compiler. `go build -race` (G11) stays the runtime
   oracle.
 - Hidden context is not coloured across package boundaries or function values
