@@ -131,8 +131,9 @@ fn Map[In, Out](xs: In[], f: fn(In) Out) Out[] = { ... };
 ```
 
 - Type parameters are written in `[...]` after the function or type name.
-- Constraints do not exist in the preview; every parameter behaves like Go `any`.
+- Constraints do not exist: every parameter behaves like Go `any`.
   Operations that need a constraint (`<`, `+`, indexing) are rejected by Go.
+  This is a deliberate limit, not a preview gap.
 - Type arguments are inferred when possible; explicit arguments are written
   `Map[i32, str](xs, f)`.
 - Generic methods cannot introduce their own type parameters.
@@ -223,7 +224,8 @@ fn main() void or error = { ... };
 - The fallible form is `T or error`, `A, B or error` or `void or error`.
   `or` supports at most one non-error result.
 - `main` may be `void` or `void or error`. An error prints to stderr and exits 1.
-- Function literals are closures. Local named functions are not part of v1.
+- Function literals are closures and the only local callable form; local named
+  functions are deliberately absent.
 
 ```hare
 fn(i: int, j: int) bool => i < j
@@ -396,6 +398,19 @@ failure with `file:line`; outside tests they panic.
 
 ## 10. Deliberately absent
 
+These are not planned, not merely missing:
+
+- local named functions; function literals are the only local callable form;
+- generic constraints; every type parameter behaves like `any`;
+- generic enums;
+- guards and tuple/struct patterns in `match`; patterns stay literal, variant
+  and type patterns;
+- lambda parameter inference without an expected type;
+- expression-level `or`; `or` is statement-level only;
+- user-declared variadic functions; Go variadic functions can still be called
+  with `...`;
+- doc comments attached to declarations; comments are formatter input only.
+
 `go`, `chan`, `select`, `async`, `await`, `try`, `catch`, `?`, `export`,
 `let`, `:=`, attributes, traits, lifetimes, arenas, `unsafe` in application
 code, method declarations outside a type, UFCS, `switch`, labeled control flow,
@@ -404,13 +419,11 @@ operator overloading, exceptions.
 ## 11. Known limits (0.2 preview)
 
 - `or` is statement-level only. It is not allowed in package-level initializers.
-- Local named functions are not supported; use function literals.
 - `break` inside a `match` case is rejected; use `return` or restructure the loop.
 - Multi-result calls cannot be nested in other expressions; `or` handles at
   most one non-error result.
 - Hidden context is not propagated across package boundaries or through
   function values; the public wrapper starts a fresh context there.
-- Generic enums are rejected.
 - `par` checks are static. There is no dynamic race detection in the compiler;
   `go build -race` is the oracle (G11). The analysis has no interprocedural
   alias or escape analysis: aliases from field/index reads and call results are

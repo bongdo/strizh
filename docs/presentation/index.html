@@ -1443,7 +1443,7 @@
     <section class="slide" id="s8" data-title="Синтаксис: generics" data-section="03 · Синтаксис">
         <div class="wrap">
             <p class="kicker">03 · Синтаксис</p>
-            <h2>Generic без новых скобок. Пока без constraints.</h2>
+            <h2>Generic без новых скобок и без constraints.</h2>
             <p class="sub">Параметры — в <code>[...]</code> после имени. На вызове типы выводятся; явные аргументы — когда без них никак.</p>
             <div class="grid two">
                 <figure class="code">
@@ -1476,7 +1476,7 @@
 <span class="kw">var</span> ys = Map(xs, <span class="kw">fn</span>(x) =&gt; x * <span class="nu">2</span>);</code></pre>
                 </figure>
             </div>
-            <p class="callout">Ограничения (<code>comparable</code>, numeric) — в <code>GAPS.md</code>. В 0.2 их нет: операцию, которой нужен constraint, отвергнет Go.</p>
+            <p class="callout">Constraints (<code>comparable</code>, numeric) не планируются: параметр типа ведёт себя как <code>any</code>, а операцию, которой нужен constraint, отвергнет Go.</p>
         </div>
     </section>
 
@@ -1852,7 +1852,7 @@
         <div class="wrap">
             <p class="kicker">08 · Границы</p>
             <h2>0.2 — вертикальный срез, а не весь gap list.</h2>
-            <p class="sub">Списки результатов, type patterns, bare nil, G10, typecheck и par core. Всё остальное — осознанно позже.</p>
+            <p class="sub">Списки результатов, type patterns, bare nil, G10, typecheck и par core — это текущее состояние. Остальное — либо текущие пределы, либо осознанный отказ.</p>
             <div class="boundaries">
                 <div class="boundary do">
                     <h3>В 0.2 закрыто</h3>
@@ -1871,18 +1871,18 @@
                 <div class="boundary dont">
                     <h3>Сознательно не делаем</h3>
                     <ul>
-                        <li>Полный <code>GAPS.md</code>.</li>
                         <li>Tuple-значения и tuple-типы.</li>
-                        <li>Generic constraints.</li>
-                        <li>Generic enums.</li>
-                        <li>Variadics.</li>
-                        <li>Expression-level <code>or</code>.</li>
+                        <li>Generic constraints и generic enums.</li>
+                        <li>Локальные именованные функции и doc comments.</li>
+                        <li>Guards, struct-паттерны и user-variadics.</li>
+                        <li>Expression-level <code>or</code>: только statement-level.</li>
                         <li>LSP refactors: rename, references, actions.</li>
+                        <li>VSIX-упаковка и расширенный набор команд CLI.</li>
                     </ul>
                 </div>
             </div>
             <blockquote>Решение для всего — <em>решение ни для чего.</em></blockquote>
-            <p class="callout">0.2 preview — вертикальный срез. Он не обещает 1.0 и не закрывает GAPS целиком.</p>
+            <p class="callout">0.2 preview: оставшиеся пробелы — в <code>GAPS.md</code>, отказы — в <code>SPEC.md</code> §10. 1.0 не обещан.</p>
         </div>
     </section>
 
@@ -1897,7 +1897,7 @@
                     </svg>
                     <h2>Strizh</h2>
                 </div>
-                <p class="sub">Прикладной язык с рантаймом Go. 0.2 preview — multiple results, type patterns, G10, typecheck и par core; остальное осознанно позже.</p>
+                <p class="sub">Прикладной язык с рантаймом Go. 0.2 preview — multiple results, type patterns, G10, typecheck и par core; остальное — текущие пределы или осознанный отказ.</p>
                 <p class="footnote">Strizh — рабочее имя.<br>0.2 preview — текущая линия; 1.0 не обещан.</p>
             </div>
             <nav class="links" aria-label="Документы">

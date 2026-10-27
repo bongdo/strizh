@@ -626,7 +626,7 @@ if (p == nil) { ... };</code></pre>
         <li><code>[]</code> — постфиксный и единственный вид скобок: срез, массив, generic.</li>
         <li><code>T[]</code> связывает крепче <code>*</code>: <code>*T[]</code> — указатель на срез, <code>(*T)[]</code> — срез указателей.</li>
         <li>Встроенные: <code>bool</code>, <code>i8</code>, <code>i16</code>, <code>i32</code>, <code>i64</code>, <code>u8</code>, <code>u16</code>, <code>u32</code>, <code>u64</code>, <code>int</code>, <code>uint</code>, <code>f32</code>, <code>f64</code>, <code>str</code>, <code>rune</code>, <code>byte</code>, <code>usize</code>, <code>isize</code>, <code>any</code>, <code>error</code>, <code>Duration</code>, <code>Type</code>.</li>
-        <li>Ограничений (constraints) в 0.2 нет: параметр типа ведёт себя как <code>any</code>.</li>
+        <li>Constraints не планируются: параметр типа ведёт себя как <code>any</code>.</li>
       </ul>
       <pre><code>type Stack[Item] = struct {
     data: Item[],
@@ -891,7 +891,7 @@ fn main() void or error = {
     </section>
 
     <section class="card" id="limits">
-      <h2><span class="num">11</span> Границы 0.2</h2>
+      <h2><span class="num">11</span> Границы: что не делаем</h2>
       <h3>Не делаем</h3>
       <ul>
         <li>Нет <code>go</code>, <code>chan</code>, <code>select</code>, <code>async</code>, <code>await</code>, <code>Promise</code>: конкурентность только блоками.</li>
@@ -899,21 +899,21 @@ fn main() void or error = {
         <li>Нет <code>:=</code>, <code>let</code>, <code>export</code>, атрибутов, <code>switch</code>, меток, UFCS, методов вне типа, embedding, перегрузки операторов.</li>
         <li>Нет <code>context</code> в прикладном коде, <code>unsafe</code>, арен, RC/ORC, трейтов и lifetimes.</li>
         <li>Нет tuple-значений: только списки результатов; результат нельзя хранить как одно значение.</li>
-        <li>Инфраструктуру — прокси, драйверы, брокеры — не пишем; берём из Go.</li>
-      </ul>
-      <h3>Ещё не в 0.2</h3>
-      <ul>
         <li>Нет generic constraints и generic enum; параметр типа ведёт себя как <code>any</code>.</li>
         <li>Нет локальных именованных функций — только function literals.</li>
         <li>Нет variadic-объявлений (<code>fn f(xs: T...)</code>); Go-variadics вызывать можно.</li>
-        <li><code>case _</code> нет — <code>else</code>; <code>break</code> из <code>match</code>-case — ошибка.</li>
-        <li><code>or</code> только statement-level; вложить в выражение нельзя.</li>
+        <li>Нет doc comments, guards, struct-паттернов и expression-level <code>or</code>: <code>or</code> только statement-level.</li>
+        <li>Инфраструктуру — прокси, драйверы, брокеры — не пишем; берём из Go.</li>
+      </ul>
+      <h3>Текущие ограничения</h3>
+      <ul>
+        <li><code>case _</code> нет — <code>else</code>; <code>break</code> из <code>match</code>-case пока запрещён.</li>
         <li>Typecheck Go работает в <code>strizh check</code> и LSP на open/save; async/debounce (G43), колонки (G34) и тестовые пакеты — ещё нет.</li>
         <li><code>par</code>-проверки статические: map-записи запрещены всегда, алиасы из полей/индексов не отслеживаются; динамический оракул — <code>go build -race</code> (G11).</li>
         <li>Method sets проверяются для Strizh/Go интерфейсов; generics, enum-варианты, массивы, function values и variadic остаются на <code>go build</code> (G27).</li>
         <li>Strizh-функция или метод со скрытым ctx получает публичный wrapper на Go-границе; дедлайн не переносится через function value или пакет.</li>
       </ul>
-      <p class="muted">0.2 — preview, не 1.0. Полный список: <a href="../../design/GAPS.md"><code>design/GAPS.md</code></a>.</p>
+      <p class="muted">0.2 — preview, не 1.0. Оставшиеся пробелы: <a href="../../design/GAPS.md"><code>design/GAPS.md</code></a>; отказы: <a href="../../design/SPEC.md"><code>design/SPEC.md</code></a> §10.</p>
     </section>
 
   </main>

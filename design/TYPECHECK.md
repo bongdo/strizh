@@ -91,8 +91,6 @@ cache makes repeated opens and saves free.
    reload unrelated ones.
 3. Add columns to `//line` (G34) so diagnostics underline the expression.
 4. Reuse the same diagnostics in `strizh test` for test files.
-5. Feed Go results into hover/definition (G41) now that `packages.Load` is
-   already set up.
 
 ## Verification
 
