@@ -1756,7 +1756,7 @@
                             <li><code>tea.NewProgram(&amp;m)</code> — методы указательные, <code>*Model</code> реализует интерфейс.</li>
                         </ul>
                     </div>
-                    <p class="callout">В 0.2 ручной Go-адаптер не нужен. Если методу нужен hidden context, G10 генерирует non-ctx обёртку с точной Go-сигнатурой; отдельного adapter-файла нет.</p>
+                    <p class="callout">Для hidden context ручной adapter-файл не нужен: G10 генерирует non-ctx обёртку с точной Go-сигнатурой. Для сложных Go API фасад всё ещё может понадобиться — это граница, а не каждый вызов.</p>
                     <p class="footnote">Фоновые таймеры и IO для Bubble Tea не нужны: <code>Cmd</code> запускает сам <code>tea.Program</code>.</p>
                 </div>
             </div>

@@ -369,7 +369,7 @@ footer.site-footer a { color: var(--teal); }
   <main id="main">
     <section id="arch">
       <h2><span class="num">01</span>Общая архитектура</h2>
-      <p>Strizh не пишет машинный код сам. Компилятор переводит <code>.str</code> в Go, а сборку делает обычный <code>go build</code>. Поэтому стандартная библиотека Go и сторонние Go-пакеты доступны напрямую, а всё, что Strizh не проверяет, в итоге проверяет компилятор Go.</p>
+      <p>Strizh не пишет машинный код сам. Компилятор переводит <code>.str</code> в Go, а сборку делает обычный <code>go build</code>. Поэтому стандартная библиотека Go и сторонние Go-пакеты доступны через `use`; raw Go — escape hatch, а сложные API лучше прятать за тонким Strizh-фасадом. Всё, что Strizh не проверяет, в итоге проверяет компилятор Go.</p>
 
       <figure class="diagram">
         <svg viewBox="0 0 1080 400" role="img" aria-labelledby="pipe-title pipe-desc">
