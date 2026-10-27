@@ -26,6 +26,7 @@ import (
 type Options struct {
 	Root   string
 	Module string
+	Tests  bool
 }
 
 type Error struct {
@@ -55,7 +56,7 @@ func Check(p *sema.Program, files map[string][]*ast.File, opt Options) (out []Er
 		}
 	}()
 	module := moduleOf(opt)
-	generated, errs := gen.Generate(p, files, gen.Options{Root: opt.Root, Module: module})
+	generated, errs := gen.Generate(p, files, gen.Options{Root: opt.Root, Module: module, IncludeTests: opt.Tests})
 	if len(errs) > 0 {
 		for _, err := range errs {
 			out = append(out, Error{Path: opt.Root, Msg: err.Error()})
@@ -70,11 +71,11 @@ func Check(p *sema.Program, files map[string][]*ast.File, opt Options) (out []Er
 		return []Error{{Path: opt.Root, Msg: "typecheck: " + err.Error()}}
 	}
 	gosum, _ := os.ReadFile(filepath.Join(opt.Root, "go.sum"))
-	key := cacheKey(module, generated, gomod, gosum)
+	key := cacheKey(module, generated, gomod, gosum, opt.Tests)
 	if errs, ok := cacheGet(key); ok {
 		return errs
 	}
-	out = load(opt.Root, module, generated, knownFiles(files))
+	out = load(opt.Root, module, generated, knownFiles(files), opt.Tests)
 	cachePut(key, out)
 	return out
 }
@@ -94,9 +95,12 @@ func knownFiles(files map[string][]*ast.File) map[string]bool {
 	return known
 }
 
-func cacheKey(module string, files []gen.File, gomod, gosum []byte) string {
+func cacheKey(module string, files []gen.File, gomod, gosum []byte, tests bool) string {
 	h := sha256.New()
 	io.WriteString(h, "strizh-typecheck-v1\x00")
+	if tests {
+		io.WriteString(h, "tests\x00")
+	}
 	io.WriteString(h, module)
 	io.WriteString(h, "\x00")
 	for _, f := range files {
@@ -149,7 +153,7 @@ func cachePut(key string, errs []Error) {
 	cacheOrder = append(cacheOrder, key)
 }
 
-func load(root, module string, files []gen.File, known map[string]bool) []Error {
+func load(root, module string, files []gen.File, known map[string]bool, tests bool) []Error {
 	overlay := make(map[string][]byte, len(files)+1)
 	importDirs := make(map[string]string, len(files))
 	seen := make(map[string]bool)
@@ -185,6 +189,7 @@ func load(root, module string, files []gen.File, known map[string]bool) []Error 
 	cfg := &packages.Config{
 		Mode:    packages.LoadImports | packages.NeedExportFile,
 		Dir:     root,
+		Tests:   tests,
 		Overlay: overlay,
 		Env:     append(os.Environ(), "GOFLAGS=-buildvcs=false"),
 	}
