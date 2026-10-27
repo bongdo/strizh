@@ -18,15 +18,11 @@ fn pass() i32, bool or error = {
 fn main() void or error = {
     var p = Pair {};
     var n, ok, err = p.Split(7);
-    if (err != nil) {
-        return err;
-    };
+    assert(err == nil);
     fmt.Println(n, ok) or return;
 
     var a, b, err2 = pass();
-    if (err2 != nil) {
-        return err2;
-    };
+    assert(err2 == nil);
     fmt.Println(a, b) or return;
 
     var c, d, err3 = p.Split(-1);

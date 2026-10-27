@@ -275,6 +275,7 @@ func (c *checker) checkStmt(s ast.Stmt) {
 		c.resolveExpr(s.X, true)
 	case *ast.IfStmt:
 		c.resolveExpr(s.Cond, false)
+		c.checkErrGuard(s)
 		c.checkBlock(s.Then)
 		if s.Else != nil {
 			c.push()
@@ -365,6 +366,69 @@ func (c *checker) checkStmt(s ast.Stmt) {
 		c.needCtx()
 		c.checkBlock(s.Body)
 	}
+}
+
+func (c *checker) checkErrGuard(s *ast.IfStmt) {
+	err := errGuard(s.Cond)
+	if err == nil || s.Then == nil || len(s.Then.Stmts) != 1 {
+		return
+	}
+	ret, ok := s.Then.Stmts[0].(*ast.ReturnStmt)
+	if !ok || !c.isErrorAstType(c.exprType(err)) {
+		return
+	}
+	for _, r := range ret.Results {
+		if id, ok := unparen(r).(*ast.Ident); ok && sameIdent(err, id) {
+			c.p.errorf(c.fc.file.Path, s.Pos(), "use or return instead of if err != nil { return err }")
+			return
+		}
+	}
+}
+
+func errGuard(cond ast.Expr) *ast.Ident {
+	bin, ok := unparen(cond).(*ast.BinaryExpr)
+	if !ok || bin.Op != token.Ne {
+		return nil
+	}
+	x, y := unparen(bin.X), unparen(bin.Y)
+	if _, ok := x.(*ast.NilLit); ok {
+		x, y = y, x
+	}
+	if _, ok := y.(*ast.NilLit); !ok {
+		return nil
+	}
+	id, _ := x.(*ast.Ident)
+	return id
+}
+
+func sameIdent(a, b *ast.Ident) bool {
+	if a.Name != b.Name {
+		return false
+	}
+	return a.Ref == nil || b.Ref == nil || a.Ref.Decl == b.Ref.Decl
+}
+
+func unparen(e ast.Expr) ast.Expr {
+	for {
+		p, ok := e.(*ast.ParenExpr)
+		if !ok {
+			return e
+		}
+		e = p.X
+	}
+}
+
+func (c *checker) isErrorAstType(t ast.Type) bool {
+	switch t := t.(type) {
+	case *ast.NamedType:
+		if t.Decl != nil && t.Decl.Kind == ast.TypeAlias {
+			return c.isErrorAstType(t.Decl.Target)
+		}
+		return t.Package == "" && t.Name == "error"
+	case *ast.GoType:
+		return isErrorType(c.p.goOf[t])
+	}
+	return false
 }
 
 func (c *checker) checkFor(f *ast.ForStmt) {
