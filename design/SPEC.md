@@ -257,6 +257,11 @@ Forms:
 side of an assignment, an expression statement, or a `return` operand. It may
 not be nested inside another expression.
 
+`if (err != nil) { return err; }` (and the multi-result form) is rejected:
+propagation has one canonical spelling, `or return`. `if err != nil` remains
+valid for inspection, logging, retry and `errors.Is`; only the pure manual
+propagation pattern is an error.
+
 `defer` is block-scoped. Deferred calls run when the enclosing block exits,
 including through `return`, `break`, `continue`, `or return` and panic.
 

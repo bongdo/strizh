@@ -375,6 +375,9 @@ var data = read("x") or err {
 
 - Никаких `try`/`catch`, `?`, `!`.
 - Ошибки — значения; `or` — сахар над проверкой.
+- `if (err != nil) { return err; }` и multi-result вариант — ошибка: проброс
+  пишется только через `or return`. `if err != nil` остаётся для инспекции,
+  логирования, retry и `errors.Is`.
 - `defer` — cleanup на выходе из блока, включая ошибки (§7).
 - `error` — Go-интерфейс; `errors.New` доступен через `use errors;`.
 
