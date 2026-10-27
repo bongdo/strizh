@@ -40,23 +40,28 @@ strizh test
 
 ## Status
 
-The 0.2 preview compiler, formatter and language server work end to end. The
-conformance suite in `tests/cases` covers structs, enums, generics, errors,
-multiple results, type patterns, `defer`, `match`, local packages, Go interop,
-hidden context wrappers and the `par` core (G1–G9: panic recovery, per-worker
-`defer`/`within`, map/pointer/alias write rules, C-style capture). `bin/check`
-runs it with the unit and LSP tests.
+The 0.2 preview compiler, formatter and language server work end to end for the
+implemented surface. The conformance suite in `tests/cases` covers structs,
+enums, generics, errors, multiple results, type patterns, `defer`, `match`,
+local packages, Go interop, hidden context wrappers and the `par` core (G1–G9:
+panic recovery, per-worker `defer`/`within`, map/pointer/alias write rules,
+C-style capture). `bin/check` runs it with the unit and LSP tests.
 
-`strizh check` now type-checks the generated Go through `internal/typecheck`
-and reports errors at `.str` positions; the LSP publishes the same diagnostics
-on open and save. Sema also checks interface conformance (method sets) for
-Strizh and Go interfaces.
+App code has one canonical way per intent. Strizh does not add a second spelling
+for the same thing, and Go stays an external library at the FFI boundary.
 
-Known limits and the full gap list are in [`design/GAPS.md`](design/GAPS.md):
-statement-level `or`, no local named functions, no generic enums, no dynamic
-race detection (G11), context loss across package/function-value boundaries,
-test files are not type-checked by `strizh check`, and the remaining LSP work.
-This is a 0.2 preview, not 1.0.
+`strizh check` type-checks the generated Go through `internal/typecheck` and
+reports errors at `.str` positions for the whole project. The LSP publishes the
+same diagnostics on open and save and adds basic editing support; it is a
+convenience, not the source of truth. Sema also checks interface conformance
+(method sets) for Strizh and Go interfaces.
+
+Known limits are in [`design/GAPS.md`](design/GAPS.md): statement-level `or`,
+no dynamic race detection (G11), context loss across package/function-value
+boundaries, and test files are not type-checked by `strizh check`. Deliberate
+non-goals (local named functions, generic constraints and enums, guards,
+expression-level `or`, user variadics, doc comments) are in
+[`design/SPEC.md`](design/SPEC.md) §10. This is a 0.2 preview, not 1.0.
 
 ## Commands
 
@@ -100,8 +105,8 @@ is copied to `.strizh/runtime`.
 
 ## Language
 
-The full specification is in [`design/SPEC.md`](design/SPEC.md). The original
-design notes and open questions are in [`design/SYNTAX.md`](design/SYNTAX.md).
+The full specification is in [`design/SPEC.md`](design/SPEC.md). The historical
+design snapshot and open questions from v0 are in [`design/SYNTAX.md`](design/SYNTAX.md).
 Compiler internals are in [`design/IMPL.md`](design/IMPL.md).
 
 Highlights:
@@ -125,10 +130,15 @@ Highlights:
 
 ## Editor support
 
+LSP diagnostics and basic editing support:
+
 - Neovim: see [`docs/lsp.md`](docs/lsp.md).
 - VS Code: [`editors/vscode`](editors/vscode) has a TextMate grammar and a
   language client. Run `npm install && npm run compile` inside it.
 - Any editor with an LSP client can use `strizh lsp`.
+
+`strizh check` remains the authoritative check: it covers the whole project and
+all files, not just the buffer you have open.
 
 ## Development
 

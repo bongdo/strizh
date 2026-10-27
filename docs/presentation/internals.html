@@ -517,7 +517,7 @@ footer.site-footer a { color: var(--teal); }
       <p>Фронтенд намеренно простой: лексер один раз проходит по байтам и выдаёт токены, парсер — рекурсивный спуск с приоритетами для бинарных операторов. Имена, типы и смысл узлов здесь не проверяются: это работа sema.</p>
 
       <h3>Токены и позиции</h3>
-      <p>Токен — это <code>token.Token{Kind, Lit, Pos, End}</code>. Позиция хранит смещение, строку и колонку. Комментарии не попадают в поток токенов: лексер возвращает их отдельным списком, а парсер складывает в <code>ast.File.Comments</code>. Этого хватает formatter'у, но привязки комментария к объявлению пока нет (G25).</p>
+      <p>Токен — это <code>token.Token{Kind, Lit, Pos, End}</code>. Позиция хранит смещение, строку и колонку. Комментарии не попадают в поток токенов: лексер возвращает их отдельным списком, а парсер складывает в <code>ast.File.Comments</code>. Этого хватает formatter'у; doc-комментарии, привязанные к объявлению, не планируются.</p>
       <ul>
         <li>Литералы: целые, дробные, строки, raw-строки в backticks, rune, duration (<code>30s</code>, <code>5m</code>).</li>
         <li>Идентификаторы — Unicode-буквы, цифры и <code>_</code>; ключевые слова Strizh и Go-слова вроде <code>func</code>/<code>range</code> проверяются отдельно.</li>
@@ -540,7 +540,7 @@ case Empty =&gt; 0.0;
       <p>Типы наращиваются постфиксно: <code>T[]</code> — срез, <code>T[N]</code> — массив, <code>T[U]</code> — инстанцирование generic-типа. В выражениях <code>x[i]</code> и <code>x[a:b]</code> — это уже индекс и срез. В типовой позиции парсер сначала пробует разобрать список типов, а если не вышло — выражение длины. В выражении <code>x[...]</code> вызов с type args распознаётся только когда за <code>]</code> идёт <code>(</code>, а аргументы похожи на типы: builtin, несколько аргументов или имя с заглавной буквы. Иначе <code>[...]</code> остаётся индексом или срезом. Если в типовой позиции один аргумент оказался константой, sema нормализует <code>GenericType</code> в <code>ArrayType</code>.</p>
 
       <h3><code>or</code></h3>
-      <p><code>or</code> разбирается только на верхнем уровне выражения: аргументы вызовов, условия и вложенные выражения используют <code>parseExprNoOr</code>. Формы три: <code>or return</code>, <code>or panic(...)</code> и <code>or err { ... }</code>. Sema дополнительно требует, чтобы слева был вызов, возвращающий ошибку, а сам <code>or</code> стоял целиком в инициализаторе, правой части, выражении-операторе или возврате. Вложить его в <code>f(g() or return)</code> нельзя — это G22.</p>
+      <p><code>or</code> разбирается только на верхнем уровне выражения: аргументы вызовов, условия и вложенные выражения используют <code>parseExprNoOr</code>. Формы три: <code>or return</code>, <code>or panic(...)</code> и <code>or err { ... }</code>. Sema дополнительно требует, чтобы слева был вызов, возвращающий ошибку, а сам <code>or</code> стоял целиком в инициализаторе, правой части, выражении-операторе или возврате. Вложить его в <code>f(g() or return)</code> нельзя: <code>or</code> — statement-level by design.</p>
       <pre><code>var f = os.Open(path) or return;
 os.Remove(path) or panic("cannot remove");
 var n = parse(text) or err {
@@ -551,7 +551,7 @@ var n = parse(text) or err {
       <h3><code>par</code>, <code>match</code>, <code>defer</code></h3>
       <ul>
         <li><code>par { ... }</code> — <code>ParStmt</code> с блоком. <code>par for (...)</code> — тот же <code>ForStmt</code>, но с <code>Par: true</code>; <code>limit</code> остаётся выражением в узле.</li>
-        <li><code>match</code> — <code>MatchExpr</code>. Тело кейса — блок или одно выражение; <code>match</code> считается выражением, только если все кейсы дали выражение. Паттерны пока простые: литерал, имя, вариант с полями; guard'ов и выражений в паттернах нет (G17).</li>
+        <li><code>match</code> — <code>MatchExpr</code>. Тело кейса — блок или одно выражение; <code>match</code> считается выражением, только если все кейсы дали выражение. Паттерны простые: литерал, имя, вариант с полями; guard'ов и выражений в паттернах нет — это осознанное ограничение.</li>
         <li><code>defer</code> требует вызов, а не произвольное выражение. Область действия — блок; это не Go-дефер на функцию, а запись в <code>DeferStack</code> (см. codegen).</li>
       </ul>
 
@@ -600,7 +600,7 @@ writing to total captured from outside par</code></pre>
       <ul>
         <li>Локальные типы: alias, struct, enum, interface. Alias не создаёт новый Go-тип.</li>
         <li>Go-типы приходят из <code>go/types</code> и превращаются в <code>ast.GoType</code> или <code>NamedType</code> с <code>PkgAlias</code>.</li>
-        <li>Generic-параметры ведут себя как <code>any</code>: constraints отсутствуют, операции вроде <code>&lt;</code> или <code>+</code> может отвергнуть уже Go. Generic enum'ы sema запрещает (G16).</li>
+        <li>Generic-параметры ведут себя как <code>any</code>: constraints отсутствуют и не планируются, операции вроде <code>&lt;</code> или <code>+</code> может отвергнуть уже Go. Generic enum'ы sema запрещает.</li>
         <li>Явные type arguments вызова пока не резолвятся: codegen печатает их из сырого AST, поэтому hover/completion по ним слабые (G18).</li>
         <li>Method sets считаются для локальных struct/interface и Go-типов; присваивание, аргумент, return и элемент composite проверяются на позиции в исходнике (G27). Неименуемые сигнатуры — generics, enum-варианты, массивы, function values, variadic — пропускаются и остаются на <code>go build</code>; явный Go <code>context.Context</code> сравнивается как обычный параметр, hidden-ctx с ним не совпадает.</li>
       </ul>
@@ -884,22 +884,19 @@ var cmd = nil[tea.Cmd];</code></pre>
         </tbody>
       </table>
 
-      <h3>Ограничения G39–G45</h3>
+      <h3>Остатки диагностики (G39, G43–G45)</h3>
       <ul>
         <li><strong>G39.</strong> Диагностика типов Go уже приходит на open/save (G26), но остались колонки (G34), async/debounce (G43), тестовые пакеты и ошибки вне <code>//line</code>.</li>
-        <li><strong>G40.</strong> Completion не знает типа выражения под курсором: после <code>u.</code> нет полей структуры, после <code>Shape.</code> нет вариантов enum, ключевые слова не контекстные.</li>
-        <li><strong>G41.</strong> Hover/definition не работают для селекторов и Go-символов; для части range-переменных definition возвращает <code>null</code>.</li>
-        <li><strong>G42.</strong> Нет rename, references, code actions, semantic tokens и folding. Только базовый набор выше.</li>
         <li><strong>G43.</strong> Анализ синхронный: <code>didChange</code> блокирует цикл сообщений, пока sema обходит проект; debounce и отмены нет.</li>
         <li><strong>G44.</strong> Очередь LSP-обвязки ограничена 64 сообщениями; при быстром наборе <code>didChange</code> может потеряться, и диагностика отстанет до следующей правки.</li>
         <li><strong>G45.</strong> При закрытии файла диагностика не очищается: закрытые файлы продолжают анализироваться с диска, сбрасываются только удалённые и standalone-документы.</li>
       </ul>
 
       <h3>Почему это не блокер для Bubble Tea</h3>
-      <p>LSP — инструмент редактирования <code>.str</code>, а не часть рантайма. Ограничения G39–G45 ухудшают hover/completion/rename, но не мешают программе на Strizh вызвать Go-библиотеку. Языковые блокеры Bubble Tea были в G13 (multi-return) и G14 (type switch по <code>any</code>); 0.2 их закрывает. G10 добавляет обёртку, если <code>Update</code> уходит в <code>par</code>/<code>within</code>. Фоновые таймеры и IO запускает сам <code>tea.Program</code>. LSP можно улучшать отдельно.</p>
+      <p>LSP — инструмент редактирования <code>.str</code>, а не часть рантайма. Авторитетная проверка — <code>strizh check</code> по всему проекту; LSP показывает те же ошибки в редакторе и добавляет базовое редактирование. Языковые блокеры Bubble Tea были в G13 (multi-return) и G14 (type switch по <code>any</code>); 0.2 их закрывает. G10 добавляет обёртку, если <code>Update</code> уходит в <code>par</code>/<code>within</code>. Фоновые таймеры и IO запускает сам <code>tea.Program</code>. LSP можно улучшать отдельно, не меняя язык.</p>
       <div class="note teal">
         <span class="note-title">Практический вывод</span>
-        <p>LSP уже даёт диагностику, включая typecheck Go; полноценный UI completion/hover по селекторам — G40/G41.</p>
+        <p>LSP даёт диагностику, включая typecheck Go, и базовое редактирование. <code>strizh check</code> проверяет весь проект и остаётся источником истины.</p>
       </div>
     </section>
 
@@ -975,8 +972,8 @@ var cmd = nil[tea.Cmd];</code></pre>
     </section>
 
     <section id="limits">
-      <h2><span class="num">10</span>Границы: 0.2 и дальше</h2>
-      <p>Strizh — это 0.2 preview. Граница между «уже работает» и «запланировано» важнее любой красивой схемы: если поведение не подтверждено кодом, страница помечает его как план. Полный список — в <a href="../../design/GAPS.md">design/GAPS.md</a>.</p>
+      <h2><span class="num">10</span>Границы: что работает и чего нет</h2>
+      <p>Strizh — это 0.2 preview. Страница отделяет подтверждённое кодом от текущих пределов и осознанных отказов. Оставшиеся пробелы — в <a href="../../design/GAPS.md">design/GAPS.md</a>; канонический список отказов — в <a href="../../design/SPEC.md">design/SPEC.md</a> §10.</p>
 
       <div class="grid-2">
         <div class="card">
@@ -991,19 +988,22 @@ var cmd = nil[tea.Cmd];</code></pre>
           </ul>
         </div>
         <div class="card">
-          <h3>Отложено</h3>
+          <h3>Сознательно не делаем</h3>
           <ul>
-            <li>Локальные именованные функции (G12), constraints (G15), generic enum'ы (G16).</li>
-            <li>Богатые паттерны и guard'ы (G17), expression-level <code>or</code> (G22), variadics (G24), doc comments (G25).</li>
-            <li>Остатки typecheck: async/debounce (G43), колонки (G34), тестовые пакеты.</li>
-            <li>Rename/references/code actions (G42), debounce и очередь LSP (G43–G45).</li>
-            <li>Динамический race oracle (G11).</li>
+            <li>Локальные именованные функции: function literals — единственная форма.</li>
+            <li>Generic constraints и generic enums.</li>
+            <li>Guards, struct-паттерны и user-variadics.</li>
+            <li>Expression-level <code>or</code>: только statement-level.</li>
+            <li>Doc comments, LSP refactors, VSIX и расширенный CLI.</li>
           </ul>
         </div>
       </div>
 
+      <h3>Что остаётся</h3>
+      <p>G11 (динамический race oracle), G34 (колонки в <code>//line</code>), G39/G43–G45 (диагностика LSP) и тестовые пакеты в typecheck. Это пределы текущей реализации, а не обещания языка.</p>
+
       <h3>Что не блокирует Bubble Tea</h3>
-      <p>LSP и formatter — инструменты, они не участвуют в рантайме. Блокеры Bubble Tea лежат в языке: multi-return (G13) и type switch по <code>any</code> (G14). Фоновые таймеры и IO запускает сам <code>tea.Program</code>. «Нет rename» и «нет hover по селектору» — неприятно, но не причина отказываться от Go-библиотек.</p>
+      <p>LSP и formatter — инструменты, они не участвуют в рантайме. Блокеры Bubble Tea лежали в языке: multi-return (G13) и type switch по <code>any</code> (G14); 0.2 их закрывает. Фоновые таймеры и IO запускает сам <code>tea.Program</code>.</p>
 
       <h3>Что читать дальше</h3>
       <ul>

@@ -12,6 +12,9 @@ oracle (G11).
 
 Effort: **S** — hours, **M** — days, **L** — a week or more.
 
+Gap IDs are stable. Numbers missing from this list were dropped as won't-do;
+[`SPEC.md`](SPEC.md) §10 is the canonical list of deliberate absences.
+
 ## What works today
 
 - `.str` files, one directory = one package, `strizh.toml`, local and Go imports.
@@ -28,11 +31,11 @@ Effort: **S** — hours, **M** — days, **L** — a week or more.
   `defer`/`within`, deterministic indexed errors, map first-completed errors,
   captured read/write rules. Aliases beyond direct assignment remain a static
   limit (G11).
-- `strizh check` parses, checks and type-checks generated Go.
+- `strizh check` is the authoritative whole-project check: it parses, checks and
+  type-checks generated Go for every file in the project.
   `strizh build/run/test` still rely on `go build` for type errors.
-- `strizh build/run/check/test/fmt/lsp/new/init`.
-- LSP diagnostics, hover, definition, completion, symbols, signature help,
-  formatting; VS Code grammar/client; Neovim setup.
+- LSP diagnostics and basic editing support; VS Code grammar/client; Neovim
+  setup.
 
 ## A. Concurrency (`par`, `par for`, `within`) — core closed
 
@@ -117,13 +120,6 @@ by Strizh.
 
 ## B. Language surface
 
-### G12. Local named functions are out of scope for 0.2
-**Сейчас:** `fn helper(...)` inside a function body is a parse error. Only
-top-level functions and function literals exist.
-**Решение:** not planned for 0.2. Function literals cover callbacks and
-closures; a named local function is a separate feature with recursion and
-capture rules. SYNTAX.md no longer promises the old example.
-
 ### G13. Multiple results are implemented, tuples are not
 **Статус:** fixed in 0.2.
 **Синтаксис:** `fn f() A, B or error`, `return a, b;`, `var a, b = f();`,
@@ -137,32 +133,8 @@ fallible multi-result call through. This unlocks `tea.Model` and Go APIs.
 **Синтаксис:** `case T as name => ...` binds, `case T => ...` tests only,
 `else => ...` is the default. Enums keep variant patterns. Open types require
 `else`.
-**Границы:** no guards, no tuple/struct patterns, no multi-type case lists.
-
-### G15. Generic constraints are missing
-**Сейчас:** every type parameter behaves like `any`; `<`, `+`, indexing and
-similar operations fail in Go.
-**Почему:** no syntax and no constraint model.
-**Фикс:** `fn F[T: comparable]`, `T: numeric`, map constraints to Go type sets;
-sema validates operations; codegen emits Go constraints.
-**Оценка:** L.
-
-### G16. Generic enums are rejected
-**Сейчас:** sema error `generic enums are not supported`.
-**Почему:** variant construction and type switches would need type arguments.
-**Фикс:** parameterize the enum interface and variant structs (`Shape[T]`,
-`ShapeCircle[T]`), carry type args on construction/patterns, instantiate at
-use sites. Alternatively keep the restriction and remove it from the design
-promise.
-**Оценка:** M.
-
-### G17. Match patterns are limited to literals and simple names
-**Сейчас:** `case -1`, `case N+1`, tuple/struct patterns and guards are not
-supported.
-**Почему:** parser patterns are literal or identifier/variant only.
-**Фикс:** parse const expressions and optional `if` guards; resolve constants;
-duplicate detection; codegen case expressions.
-**Оценка:** M.
+**Границы:** patterns are literal, variant or type patterns only; no guards, no
+tuple/struct patterns, no multi-type case lists.
 
 ### G18. Type arguments on calls are not resolved by sema
 **Сейчас:** `Map[i32, str](...)` is parsed and codegen reparses raw types; sema
@@ -171,14 +143,6 @@ does not resolve `Call.TypeArgs`, so hover/completion/inference are blind.
 **Фикс:** resolve each `TypeArg` with `resolveType`; attach the generic
 declaration and instantiated types to `CallInfo`.
 **Оценка:** S.
-
-### G19. Lambda parameter inference needs an expected type
-**Сейчас:** `fn(i, j) => ...` works as a Go/Strizh callback argument, but
-`var f = fn(x) => x` fails.
-**Почему:** no bidirectional inference for assignments without a type.
-**Фикс:** infer from the body where possible, or require explicit parameter
-types and give a targeted error. Document the rule.
-**Оценка:** S/M.
 
 ### G20. `nil` typing
 **Статус:** fixed in 0.2.
@@ -195,36 +159,11 @@ loop.
 to `break _s_loop`/`continue _s_loop`; or keep the restriction and document it.
 **Оценка:** S.
 
-### G22. `or` is statement-level only
-**Сейчас:** `f(g() or return)` is rejected; `or` must be the whole initializer,
-RHS, expression statement or return value.
-**Почему:** no expression-level control-flow lowering.
-**Фикс:** add an AST pass that hoists fallible calls into temporaries before
-statements; then `or` can appear anywhere. Alternatively keep the documented
-restriction; the current SPEC already says statement-level.
-**Оценка:** M.
-
 ### G23. String indexing returns a byte
 **Сейчас:** `s[i]` is Go's byte; users must call `runes(s)` for rune work.
 **Почему:** `str` maps directly to Go `string`.
 **Фикс:** document the byte rule, or add `at(s, i) rune` / `runes(s)` as the
 preferred form; changing `s[i]` to rune would surprise Go users.
-**Оценка:** S.
-
-### G24. User-declared variadic functions are missing
-**Сейчас:** Go variadics can be called with `...`, but `fn f(xs: T...)` is not
-in the grammar.
-**Почему:** parameters are fixed-arity only.
-**Фикс:** add `param...` to the AST, sema and codegen (`xs ...T`); calls with
-spread. Go interop already has the call-side support.
-**Оценка:** S/M.
-
-### G25. Doc comments are not attached to declarations
-**Сейчас:** the lexer/parser preserve comments for the formatter, but sema/LSP
-do not know which comment documents which symbol.
-**Почему:** comments are a flat file list.
-**Фикс:** attach leading comments to `Decl` nodes; include them in hover and a
-future `strizh doc`.
 **Оценка:** S.
 
 ## C. Sema and type checking
@@ -321,12 +260,9 @@ name.
 file import set; fail with a Strizh error if a type cannot be named.
 **Оценка:** M.
 
-### G36. `or` in multiple RHS / a `for` post is only rejected
-**Сейчас:** sema errors instead of lowering; no fallback.
-**Почему:** statement-level codegen.
-**Фикс:** after G22, the hoisting pass handles these positions; until then keep
-the clear error.
-**Оценка:** covered by G22.
+### G36. `or` in multiple RHS / a `for` post is rejected
+**Статус:** by design. `or` stays statement-level; these positions give a clear
+error. The restriction is listed in [`SPEC.md`](SPEC.md) §10.
 
 ### G37. Generation always rewrites whole files
 **Сейчас:** each build writes `zz_strizh.go` for every package; there is no
@@ -350,31 +286,6 @@ publish mapped diagnostics with source `strizh`; `didChange` clears them until
 the next save. Parser/sema diagnostics work as before.
 **Остаток:** async/debounce and cancellation (G43), columns (G34), test files,
 and publishing errors for generated code that is not covered by `//line`.
-
-### G40. Completion is context-limited
-**Сейчас:** package members after `pkg.`, local names, keywords and builtins.
-No field completion after `u.`, no enum variants after `Shape.`, no
-context-aware keywords.
-**Почему:** no expression-type lookup at the cursor.
-**Фикс:** find the node at the cursor; use `sema.ExprTypes`/`Ref` to resolve
-struct fields, methods, enum variants and module members; add snippets.
-**Оценка:** M.
-
-### G41. Hover/definition do not work for selectors and Go symbols
-**Сейчас:** hover works for simple idents/functions/types; definition returns
-null for Go objects and some range variables.
-**Почему:** no `go/types` file set/source positions; selector hover is not
-implemented.
-**Фикс:** load Go packages with `NeedSyntax`/`Fset`; store object positions;
-resolve selector types; add hover for `SelectorExpr`/`NamedType`.
-**Оценка:** M.
-
-### G42. No rename, references, code actions, semantic tokens or folding
-**Сейчас:** only the basic LSP set.
-**Почему:** not implemented.
-**Фикс:** symbol index + reference walk; semantic token encoder; folding from
-blocks/comments; quickfixes for unused imports and `or`.
-**Оценка:** L.
 
 ### G43. LSP analysis is synchronous and has no debounce/cancellation
 **Сейчас:** a `didChange` blocks the message loop while sema walks the project;
@@ -408,21 +319,6 @@ there is no line-width wrapping.
 optional `--wrap` later.
 **Оценка:** M.
 
-### G47. VS Code extension is not packaged or integration-tested
-**Сейчас:** TypeScript compiles; `npm run compile` works; no `.vsix`, no test in
-a real VS Code instance.
-**Почему:** not part of the core check.
-**Фикс:** `@vscode/test-electron`, a smoke workspace, `vsce package`, CI.
-**Оценка:** M.
-
-### G48. CLI lacks several expected commands
-**Сейчас:** no `strizh doc`, `clean`, `watch`, `vet`, `fmt -l/-d`, stdin mode,
-or install script.
-**Почему:** the minimal command set was enough for the language.
-**Фикс:** add `clean` (remove generated), `fmt -l/-d`, `doc` (from comments),
-`vet` (Go vet with mapped paths); watch is optional.
-**Оценка:** M.
-
 ## Bubble Tea
 
 Bubble Tea is Go and is callable from Strizh. 0.2 removes the two language
@@ -441,15 +337,15 @@ clipboard, themes and completion are separate UI work.
 ## Suggested order
 
 0.2 was the vertical slice: multiple results, type patterns, bare `nil`, G10,
-G26/G27 and the `par` core. Everything else is deliberately later.
+G26/G27 and the `par` core. The list below is the actual remaining work.
 
 1. G11: dynamic race oracle (`-race` docs and path). G1–G9 are closed.
-2. G15–G25: the remaining language surface — constraints, generic enums,
-   richer patterns, type arguments, inference, `break` in `match`,
-   expression-level `or`, string indexing, variadics, doc comments. G13, G14
+2. G18, G21, G23: the remaining language surface — explicit call type
+   arguments, `break` inside `match`, and the string-indexing rule. G13, G14
    and G20 are already fixed.
-3. G32–G38: codegen and runtime cleanup.
-4. G39–G48: LSP quality and tooling; G39 is partly closed by G26.
+3. G32–G38: codegen and runtime cleanup. G36 is a clear diagnostic, not a
+   missing feature.
+4. G39, G43–G46: diagnostics and tooling; G39 is partly closed by G26.
 
 ## Commands
 
