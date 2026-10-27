@@ -22,7 +22,8 @@ module = "example.com/hello"
 - Local imports use a path: `use "./internal/ed" as ed;`.
 - Go imports use a Go import path: `use fmt;`,
   `use "charm.land/bubbletea/v2" as tea;`.
-  A bare name without `/` is always a Go import.
+  A bare name without `/` is always a Go import. A quoted simple path
+  (`use "fmt";`) is rejected; the simple form is canonical.
 - Generated Go lives next to the sources as `zz_strizh.go` and
   `zz_strizh_test.go`. `.strizh/` holds generated support files.
 
