@@ -227,7 +227,12 @@ func (p *parser) parseUse() *ast.Use {
 	case token.Ident:
 		u.Path = p.next().Lit
 	case token.String, token.RawString:
-		u.Path = p.stringLit(p.next())
+		t := p.next()
+		u.Path = p.stringLit(t)
+		u.Local = strings.HasPrefix(u.Path, "./") || strings.HasPrefix(u.Path, "../")
+		if !u.Local && !strings.ContainsAny(u.Path, "/.") {
+			p.errorf(t.Pos, "simple import must be bare: use %s;", u.Path)
+		}
 	default:
 		p.errorf(p.tok().Pos, "expected import path, found %s", describe(p.tok()))
 	}
@@ -238,7 +243,6 @@ func (p *parser) parseUse() *ast.Use {
 		}
 	}
 	p.consumeSemi()
-	u.Local = strings.HasPrefix(u.Path, "./") || strings.HasPrefix(u.Path, "../")
 	u.Span = p.fin(start)
 	return u
 }

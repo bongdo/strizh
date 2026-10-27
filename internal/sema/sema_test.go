@@ -58,6 +58,27 @@ fn main() void or error = {
 	noErrors(t, p)
 }
 
+func TestUseForms(t *testing.T) {
+	p := checkSrc(t, map[string]string{
+		".": `use fmt as f;
+use "net/http" as http;
+use "./lib" as lib;
+
+fn main() void or error = {
+    f.Println("hi") or return;
+    var h = http.Header {};
+    _ = h;
+    _ = lib.Square(2);
+};
+`,
+		"lib": `fn Square(x: i32) i32 = {
+    return x * x;
+};
+`,
+	})
+	noErrors(t, p)
+}
+
 func TestStructMethod(t *testing.T) {
 	p := checkSrc(t, map[string]string{".": `type User = struct {
     Name: str,
@@ -79,6 +100,19 @@ fn main() void = {
 };
 `})
 	noErrors(t, p)
+}
+
+func TestStructLiteralNeedsNamedFields(t *testing.T) {
+	p := checkSrc(t, map[string]string{".": `type User = struct {
+    Name: str,
+};
+
+fn main() void = {
+    var u = User { "a" };
+    _ = u;
+};
+`})
+	wantError(t, p, "struct literal entry needs field = value")
 }
 
 func TestEnumMatch(t *testing.T) {

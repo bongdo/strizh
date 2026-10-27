@@ -347,6 +347,35 @@ func TestRealisticFile(t *testing.T) {
 	}
 }
 
+func TestUseCanonical(t *testing.T) {
+	for _, src := range []string{
+		"use fmt;",
+		"use fmt as f;",
+		`use "net/http" as http;`,
+		`use "./lib" as lib;`,
+		`use "../x";`,
+	} {
+		f, errs := Parse("use.str", []byte(src))
+		if len(errs) != 0 {
+			t.Errorf("%q: unexpected errors: %v", src, errs)
+		}
+		if len(f.Uses) != 1 {
+			t.Errorf("%q: uses = %+v", src, f.Uses)
+		}
+	}
+
+	for _, c := range []struct{ src, hint string }{
+		{`use "fmt";`, "use fmt;"},
+		{`use "fmt" as f;`, "use fmt;"},
+		{"use `os`;", "use os;"},
+	} {
+		_, errs := Parse("use.str", []byte(c.src))
+		if len(errs) != 1 || !strings.Contains(errs[0].Msg, c.hint) {
+			t.Errorf("%q: errors = %v", c.src, errs)
+		}
+	}
+}
+
 const statementsSrc = `fn f(n: int) void = {
     var a, b = 1, 2;
     const c = 3;
