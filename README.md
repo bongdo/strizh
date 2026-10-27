@@ -58,7 +58,8 @@ convenience, not the source of truth. Sema also checks interface conformance
 
 Known limits are in [`design/GAPS.md`](design/GAPS.md): statement-level `or`,
 no dynamic race detection (G11), context loss across package/function-value
-boundaries, and test files are not type-checked by `strizh check`. Deliberate
+boundaries, and the LSP does not type-check `test` blocks (while `strizh check`
+does). Deliberate
 non-goals (local named functions, generic constraints and enums, guards,
 expression-level `or`, user variadics, doc comments) are in
 [`design/SPEC.md`](design/SPEC.md) §10. This is a 0.2 preview, not 1.0.

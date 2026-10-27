@@ -908,7 +908,7 @@ fn main() void or error = {
       <h3>Текущие ограничения</h3>
       <ul>
         <li><code>case _</code> нет — <code>else</code>; <code>break</code> из <code>match</code>-case пока запрещён.</li>
-        <li>Typecheck Go работает в <code>strizh check</code> и LSP на open/save; async/debounce (G43), колонки (G34) и тестовые пакеты — ещё нет.</li>
+        <li>Typecheck Go работает в <code>strizh check</code> (включая <code>test</code>-блоки) и LSP на open/save; async/debounce (G43), колонки (G34) и тестовые пакеты в LSP — ещё нет.</li>
         <li><code>par</code>-проверки статические: map-записи запрещены всегда, алиасы из полей/индексов не отслеживаются; динамический оракул — <code>go build -race</code> (G11).</li>
         <li>Method sets проверяются для Strizh/Go интерфейсов; generics, enum-варианты, массивы, function values и variadic остаются на <code>go build</code> (G27).</li>
         <li>Strizh-функция или метод со скрытым ctx получает публичный wrapper на Go-границе; дедлайн не переносится через function value или пакет.</li>

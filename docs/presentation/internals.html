@@ -886,7 +886,7 @@ var cmd = nil[tea.Cmd];</code></pre>
 
       <h3>Остатки диагностики (G39, G43–G45)</h3>
       <ul>
-        <li><strong>G39.</strong> Диагностика типов Go уже приходит на open/save (G26), но остались колонки (G34), async/debounce (G43), тестовые пакеты и ошибки вне <code>//line</code>.</li>
+        <li><strong>G39.</strong> Диагностика типов Go уже приходит на open/save (G26), а <code>strizh check</code> проверяет и test-блоки; остались колонки (G34), async/debounce (G43), test-диагностика в LSP и ошибки вне <code>//line</code>.</li>
         <li><strong>G43.</strong> Анализ синхронный: <code>didChange</code> блокирует цикл сообщений, пока sema обходит проект; debounce и отмены нет.</li>
         <li><strong>G44.</strong> Очередь LSP-обвязки ограничена 64 сообщениями; при быстром наборе <code>didChange</code> может потеряться, и диагностика отстанет до следующей правки.</li>
         <li><strong>G45.</strong> При закрытии файла диагностика не очищается: закрытые файлы продолжают анализироваться с диска, сбрасываются только удалённые и standalone-документы.</li>
@@ -1000,7 +1000,7 @@ var cmd = nil[tea.Cmd];</code></pre>
       </div>
 
       <h3>Что остаётся</h3>
-      <p>G11 (динамический race oracle), G34 (колонки в <code>//line</code>), G39/G43–G45 (диагностика LSP) и тестовые пакеты в typecheck. Это пределы текущей реализации, а не обещания языка.</p>
+      <p>G11 (динамический race oracle), G34 (колонки в <code>//line</code>), G39/G43–G45 (диагностика LSP) и test-диагностика в LSP. Это пределы текущей реализации, а не обещания языка.</p>
 
       <h3>Что не блокирует Bubble Tea</h3>
       <p>LSP и formatter — инструменты, они не участвуют в рантайме. Блокеры Bubble Tea лежали в языке: multi-return (G13) и type switch по <code>any</code> (G14); 0.2 их закрывает. Фоновые таймеры и IO запускает сам <code>tea.Program</code>.</p>
