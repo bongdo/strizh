@@ -80,9 +80,8 @@ use "../shared/config" as config;
 становиться стилистическим выбором. Частый случай (stdlib) должен быть
 коротким, редкий (third-party path) — явным.
 
-**0.2:** парсер принимает `use "fmt";`; форматтер уже приводит его к
-`use fmt;`. Alias для `/v2` пока не обязателен — это надо закрепить в sema
-или линтере.
+**0.2:** `use "fmt";` уже ошибка парсера; канон — `use fmt;`. Alias для
+`/v2` пока не обязателен — это надо закрепить в sema или линтере.
 
 ### 2.2. Struct literals
 
@@ -264,7 +263,7 @@ var xs = u8[] {};
 
 **0.2:** `nil[T]` разрешён всегда, даже при известном expected type. Это
 кандидат на warning + autofix, не на жёсткую ошибку: в `any`-контексте
-`nil[T]` бывает нужен.
+`nil[T]` бывает нужен. Аудит вариантов — в `NIL.md`.
 
 ### 2.7. Комментарии
 
@@ -425,7 +424,7 @@ flow. См. §10 в [SPEC.md](SPEC.md).
 | `match` с одним `else` | anti-pattern | lint |
 | `if`-цепочка по enum | anti-pattern | lint, если можно доказать |
 | map в `par for` | forbidden (target) | sema; сейчас разрешён с ord `-1` |
-| `/* */` | forbidden (target) | parser; сейчас warning |
+| `/* */` | forbidden (target) | lexer; уже error |
 | doc comments | absent | комментарии не привязаны к символам |
 | Go-типы в публичном API | forbidden | review + FFI; линтер по сигнатурам — позже |
 
