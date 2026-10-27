@@ -1,0 +1,2079 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0f1115">
+<title>Strizh — язык приложений на рантайме Go</title>
+<meta name="description" content="Strizh: Go runtime, Hare-подобный синтаксис, sum types и структурная конкурентность. 0.2 preview: multiple results, type patterns, Go context wrappers.">
+<style>
+    :root {
+        --bg: #0f1115;
+        --bg-soft: #141922;
+        --panel: #161b22;
+        --text: #e8e6e1;
+        --muted: #8b949e;
+        --amber: #e0a458;
+        --teal: #6fb3a8;
+        --line: #232a35;
+        --line-soft: #1b212b;
+        --code: #161b22;
+        --green: #a8b98a;
+        --num: #d9b38c;
+        --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+        --radius: 14px;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; }
+
+    html {
+        background: var(--bg);
+        color: var(--text);
+        font-family: var(--sans);
+        scroll-behavior: smooth;
+        -webkit-text-size-adjust: 100%;
+    }
+
+    body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        -webkit-font-smoothing: antialiased;
+        text-rendering: optimizeLegibility;
+    }
+
+    ::selection { background: rgba(224, 164, 88, .28); color: var(--text); }
+
+    a { color: var(--teal); }
+
+    [hidden] { display: none !important; }
+
+    .skip {
+        position: fixed;
+        left: 1rem;
+        top: -6rem;
+        z-index: 100;
+        padding: .6rem .9rem;
+        border-radius: 6px;
+        background: var(--amber);
+        color: #0f1115;
+        font-family: var(--mono);
+        font-size: .78rem;
+        text-decoration: none;
+        transition: top .15s ease;
+    }
+
+    .skip:focus { top: 1rem; }
+
+    :focus-visible {
+        outline: 2px solid var(--amber);
+        outline-offset: 3px;
+    }
+
+    .topbar {
+        position: fixed;
+        inset: 0 0 auto 0;
+        z-index: 50;
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        padding: .7rem clamp(1rem, 3vw, 2rem);
+        background: rgba(15, 17, 21, .9);
+        border-bottom: 1px solid rgba(35, 42, 53, .7);
+        backdrop-filter: blur(12px);
+    }
+
+    .brand {
+        display: inline-flex;
+        align-items: center;
+        gap: .55rem;
+        color: var(--text);
+        text-decoration: none;
+        font-weight: 600;
+        letter-spacing: -.01em;
+        white-space: nowrap;
+    }
+
+    .brand svg {
+        width: 24px;
+        height: 24px;
+        color: var(--amber);
+        flex: none;
+    }
+
+    .brand-sub {
+        color: var(--muted);
+        font-family: var(--mono);
+        font-size: .66rem;
+        font-weight: 400;
+        letter-spacing: .1em;
+        text-transform: uppercase;
+    }
+
+    .topbar-section {
+        margin-left: auto;
+        overflow: hidden;
+        color: var(--muted);
+        font-family: var(--mono);
+        font-size: .68rem;
+        letter-spacing: .14em;
+        text-overflow: ellipsis;
+        text-transform: uppercase;
+        white-space: nowrap;
+    }
+
+    .print-btn {
+        flex: none;
+        padding: .42rem .68rem;
+        border: 1px solid rgba(224, 164, 88, .32);
+        border-radius: 999px;
+        background: transparent;
+        color: var(--amber);
+        font: inherit;
+        font-family: var(--mono);
+        font-size: .66rem;
+        letter-spacing: .08em;
+        text-transform: uppercase;
+        cursor: pointer;
+        transition: background .2s ease, border-color .2s ease;
+    }
+
+    .print-btn:hover { background: rgba(224, 164, 88, .08); border-color: var(--amber); }
+
+    .slide {
+        position: relative;
+        display: flex;
+        align-items: center;
+        min-height: 100vh;
+        min-height: 100svh;
+        padding: clamp(5.5rem, 10vh, 8rem) clamp(1.25rem, 5vw, 5rem) clamp(4.5rem, 9vh, 7rem);
+        border-bottom: 1px solid var(--line-soft);
+    }
+
+    .slide:last-of-type { border-bottom: 0; }
+
+    .slide::after {
+        position: absolute;
+        inset: auto 0 0 0;
+        height: 1px;
+        background: linear-gradient(90deg, transparent, rgba(224, 164, 88, .22), transparent);
+        content: "";
+        pointer-events: none;
+    }
+
+    .slide:last-of-type::after { display: none; }
+
+    .wrap {
+        position: relative;
+        z-index: 1;
+        width: min(1180px, 100%);
+        margin: 0 auto;
+    }
+
+    .hero { overflow: hidden; }
+
+    .hero::before {
+        position: absolute;
+        inset: 0;
+        background:
+            radial-gradient(900px 620px at 12% 12%, rgba(224, 164, 88, .1), transparent 62%),
+            radial-gradient(820px 520px at 92% 88%, rgba(111, 179, 168, .08), transparent 62%);
+        content: "";
+        pointer-events: none;
+    }
+
+    .hero .wrap {
+        display: grid;
+        grid-template-columns: minmax(0, 1.25fr) minmax(280px, .75fr);
+        gap: clamp(2rem, 5vw, 4.5rem);
+        align-items: center;
+    }
+
+    .hero-main { min-width: 0; }
+
+    .hero-mark {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        margin-bottom: 1.4rem;
+    }
+
+    .hero-mark svg {
+        width: clamp(56px, 7vw, 84px);
+        height: auto;
+        color: var(--amber);
+        flex: none;
+    }
+
+    .hero-kicker {
+        color: var(--muted);
+        font-family: var(--mono);
+        font-size: .7rem;
+        letter-spacing: .16em;
+        text-transform: uppercase;
+    }
+
+    h1 {
+        margin: 0;
+        font-size: clamp(4rem, 13vw, 9rem);
+        font-weight: 600;
+        letter-spacing: -.055em;
+        line-height: .86;
+    }
+
+    h2 {
+        max-width: 20ch;
+        margin: 0;
+        font-size: clamp(2rem, 4.4vw, 3.5rem);
+        font-weight: 600;
+        letter-spacing: -.035em;
+        line-height: 1.03;
+    }
+
+    h2.wide { max-width: 28ch; }
+
+    h3 {
+        margin: 0 0 .45rem;
+        font-size: 1.02rem;
+        font-weight: 600;
+        letter-spacing: -.01em;
+        line-height: 1.3;
+    }
+
+    .kicker {
+        margin: 0 0 .9rem;
+        color: var(--amber);
+        font-family: var(--mono);
+        font-size: .7rem;
+        letter-spacing: .18em;
+        text-transform: uppercase;
+    }
+
+    .lead {
+        max-width: 46rem;
+        margin: 1.5rem 0 0;
+        color: #c9c6bf;
+        font-size: clamp(1.1rem, 1.6vw, 1.35rem);
+        line-height: 1.55;
+    }
+
+    .sub {
+        max-width: 66ch;
+        margin: 1.1rem 0 0;
+        color: #c9c6bf;
+        font-size: clamp(1rem, 1.3vw, 1.1rem);
+        line-height: 1.6;
+    }
+
+    .footnote {
+        margin: 1.4rem 0 0;
+        color: var(--muted);
+        font-family: var(--mono);
+        font-size: .72rem;
+        letter-spacing: .03em;
+        line-height: 1.6;
+    }
+
+    .chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: .6rem;
+        margin-top: 1.8rem;
+    }
+
+    .chip {
+        display: inline-flex;
+        align-items: center;
+        gap: .5rem;
+        padding: .48rem .7rem;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        color: var(--muted);
+        font-family: var(--mono);
+        font-size: .69rem;
+        letter-spacing: .03em;
+    }
+
+    .chip-dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: var(--teal);
+        flex: none;
+    }
+
+    .chip.amber .chip-dot { background: var(--amber); }
+
+    .hint {
+        margin: 2.2rem 0 0;
+        color: var(--muted);
+        font-family: var(--mono);
+        font-size: .68rem;
+        letter-spacing: .06em;
+        line-height: 1.7;
+    }
+
+    .js-only { display: none; }
+    .js .js-only { display: block; }
+
+    .equation {
+        padding: clamp(1.4rem, 3vw, 2.4rem);
+        border: 1px solid var(--line);
+        border-radius: 20px;
+        background:
+            linear-gradient(160deg, rgba(224, 164, 88, .06), rgba(111, 179, 168, .04)),
+            var(--bg-soft);
+    }
+
+    .eq-caption {
+        display: block;
+        margin-bottom: 1.2rem;
+        color: var(--muted);
+        font-family: var(--mono);
+        font-size: .64rem;
+        letter-spacing: .16em;
+        text-transform: uppercase;
+    }
+
+    .eq-term {
+        font-size: clamp(1.05rem, 1.7vw, 1.3rem);
+        line-height: 1.35;
+    }
+
+    .eq-op {
+        margin: .42rem 0 .42rem .15rem;
+        color: var(--amber);
+        font-family: var(--mono);
+        font-size: .92rem;
+        line-height: 1;
+    }
+
+    .eq-rule {
+        height: 1px;
+        margin: 1.25rem 0 1rem;
+        background: var(--line);
+    }
+
+    .eq-result {
+        color: var(--amber);
+        font-size: clamp(2.4rem, 4.2vw, 3.4rem);
+        font-weight: 600;
+        letter-spacing: -.05em;
+        line-height: .95;
+    }
+
+    .grid {
+        display: grid;
+        gap: 1rem;
+        margin-top: 2rem;
+    }
+
+    .grid.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .grid.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .grid > * { min-width: 0; }
+
+    .stack {
+        display: grid;
+        gap: 1rem;
+        align-content: start;
+        min-width: 0;
+    }
+
+    .mt { margin-top: 1rem; }
+
+    .card {
+        padding: 1.15rem 1.2rem;
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        background: rgba(22, 27, 34, .72);
+    }
+
+    .card p {
+        margin: 0;
+        color: var(--muted);
+        font-size: .93rem;
+        line-height: 1.55;
+    }
+
+    .card p + p { margin-top: .6rem; }
+
+    .num {
+        display: block;
+        margin-bottom: .55rem;
+        color: var(--amber);
+        font-family: var(--mono);
+        font-size: .66rem;
+        letter-spacing: .12em;
+    }
+
+    .principles {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 2rem 1.6rem;
+        margin-top: 2.5rem;
+    }
+
+    .principle {
+        min-width: 0;
+        padding-top: 1rem;
+        border-top: 1px solid var(--line);
+    }
+
+    .principle h3 { margin: .4rem 0 .4rem; font-size: 1.05rem; }
+
+    .principle p {
+        margin: 0;
+        color: var(--muted);
+        font-size: .92rem;
+        line-height: 1.55;
+    }
+
+    .callout {
+        margin: 1.5rem 0 0;
+        padding: .95rem 1.1rem;
+        border-left: 2px solid var(--amber);
+        background: rgba(224, 164, 88, .055);
+        color: #d8d4cc;
+        font-size: .95rem;
+        line-height: 1.6;
+    }
+
+    .callout.teal {
+        border-left-color: var(--teal);
+        background: rgba(111, 179, 168, .055);
+    }
+
+    .callout strong { color: var(--text); }
+
+    .rules {
+        display: grid;
+        gap: .48rem;
+        margin: 0;
+        padding: 0;
+        list-style: none;
+    }
+
+    .rules li {
+        position: relative;
+        padding-left: 1.05rem;
+        color: #c9c6bf;
+        font-size: .93rem;
+        line-height: 1.5;
+    }
+
+    .rules li::before {
+        position: absolute;
+        left: 0;
+        top: .62em;
+        width: 5px;
+        height: 5px;
+        border-radius: 1px;
+        background: var(--amber);
+        content: "";
+    }
+
+    .rules.teal li::before { background: var(--teal); }
+
+    figure.code {
+        overflow: hidden;
+        margin: 0;
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        background: var(--code);
+    }
+
+    figure.code figcaption {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        padding: .55rem .9rem;
+        border-bottom: 1px solid var(--line-soft);
+        color: var(--muted);
+        font-family: var(--mono);
+        font-size: .65rem;
+        letter-spacing: .08em;
+        text-transform: uppercase;
+    }
+
+    figure.code figcaption > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+    .badge {
+        flex: none;
+        padding: .18rem .45rem;
+        border: 1px solid rgba(224, 164, 88, .3);
+        border-radius: 999px;
+        color: var(--amber);
+        font-size: .62rem;
+        letter-spacing: .08em;
+    }
+
+    .badge.teal {
+        border-color: rgba(111, 179, 168, .3);
+        color: var(--teal);
+    }
+
+    figure.code pre {
+        max-width: 100%;
+        margin: 0;
+        padding: 1rem 1.05rem;
+        overflow-x: auto;
+        color: #d6d2ca;
+        font-family: var(--mono);
+        font-size: clamp(.77rem, .95vw, .88rem);
+        line-height: 1.65;
+        tab-size: 4;
+        scrollbar-color: var(--line) transparent;
+        scrollbar-width: thin;
+    }
+
+    figure.code pre:focus-visible { outline-offset: -2px; }
+
+    figure.code code { font-family: inherit; }
+
+    .kw { color: var(--amber); }
+    .ty { color: var(--teal); }
+    .st { color: var(--green); }
+    .nu { color: var(--num); }
+    .self { color: var(--teal); font-style: italic; }
+    .dim { color: var(--muted); }
+
+    :not(pre) > code {
+        padding: .08em .32em;
+        border: 1px solid var(--line-soft);
+        border-radius: 4px;
+        background: rgba(255, 255, 255, .045);
+        color: #dedad2;
+        font-family: var(--mono);
+        font-size: .9em;
+    }
+
+    h1 code,
+    h2 code,
+    h3 code {
+        padding: 0;
+        border: 0;
+        background: transparent;
+        color: var(--teal);
+        font-size: .88em;
+    }
+
+    .table-wrap { overflow-x: auto; }
+
+    table.type-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: .9rem;
+    }
+
+    table.type-table th {
+        padding: .4rem .45rem;
+        border-bottom: 1px solid var(--line);
+        color: var(--muted);
+        font-family: var(--mono);
+        font-size: .62rem;
+        font-weight: 500;
+        letter-spacing: .1em;
+        text-align: left;
+        text-transform: uppercase;
+    }
+
+    table.type-table td {
+        padding: .5rem .45rem;
+        border-bottom: 1px solid var(--line-soft);
+        color: #c9c6bf;
+        vertical-align: top;
+    }
+
+    table.type-table tr:last-child td { border-bottom: 0; }
+
+    table.type-table td:first-child {
+        color: var(--teal);
+        font-family: var(--mono);
+        font-size: .82rem;
+        white-space: nowrap;
+    }
+
+    .compare {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 1rem;
+        margin-top: 1.6rem;
+    }
+
+    .compare > * { min-width: 0; }
+
+    .flow {
+        display: grid;
+        gap: .4rem;
+        margin-top: .4rem;
+    }
+
+    .flow-step {
+        display: flex;
+        align-items: stretch;
+        gap: .7rem;
+    }
+
+    .flow-num {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 2rem;
+        flex: none;
+        color: var(--amber);
+        font-family: var(--mono);
+        font-size: .64rem;
+        letter-spacing: .08em;
+    }
+
+    .flow-step .box {
+        flex: 1;
+        padding: .65rem .8rem;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: rgba(22, 27, 34, .75);
+        color: var(--text);
+        font-family: var(--mono);
+        font-size: .78rem;
+        line-height: 1.4;
+        overflow-wrap: anywhere;
+    }
+
+    .flow-step .box span {
+        display: block;
+        margin-top: .15rem;
+        color: var(--muted);
+        font-family: var(--sans);
+        font-size: .72rem;
+    }
+
+    .flow-arrow {
+        padding-left: 2.55rem;
+        color: var(--amber);
+        font-family: var(--mono);
+        font-size: .8rem;
+        line-height: 1;
+    }
+
+    .g10 {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+        gap: 1rem;
+        align-items: center;
+        margin-top: 1.8rem;
+    }
+
+    .g10-col {
+        display: grid;
+        gap: .6rem;
+        min-width: 0;
+    }
+
+    .g10-label {
+        color: var(--muted);
+        font-family: var(--mono);
+        font-size: .62rem;
+        letter-spacing: .12em;
+        text-transform: uppercase;
+    }
+
+    .g10-box {
+        padding: .8rem .9rem;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        background: rgba(22, 27, 34, .72);
+        color: var(--text);
+        font-family: var(--mono);
+        font-size: .76rem;
+        line-height: 1.5;
+        overflow-wrap: anywhere;
+    }
+
+    .g10-box span {
+        display: block;
+        margin-top: .2rem;
+        color: var(--muted);
+        font-size: .68rem;
+    }
+
+    .g10-arrow {
+        color: var(--amber);
+        font-family: var(--mono);
+        font-size: 1.2rem;
+    }
+
+    .boundaries {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 1.6rem;
+        margin-top: 2rem;
+    }
+
+    .boundary {
+        padding-top: 1.1rem;
+        border-top: 1px solid var(--line);
+    }
+
+    .boundary.do { border-top-color: var(--teal); }
+    .boundary.dont { border-top-color: var(--amber); }
+
+    .boundary h3 { margin: 0 0 .75rem; font-size: 1.1rem; }
+
+    .boundary ul {
+        display: grid;
+        gap: .45rem;
+        margin: 0;
+        padding: 0;
+        list-style: none;
+    }
+
+    .boundary li {
+        position: relative;
+        padding-left: 1rem;
+        color: #c9c6bf;
+        font-size: .94rem;
+        line-height: 1.45;
+    }
+
+    .boundary li::before {
+        position: absolute;
+        left: 0;
+        top: .6em;
+        width: 5px;
+        height: 5px;
+        border-radius: 1px;
+        background: var(--teal);
+        content: "";
+    }
+
+    .boundary.dont li::before { background: var(--muted); }
+
+    blockquote {
+        max-width: 24ch;
+        margin: 2.6rem 0 0;
+        color: var(--text);
+        font-size: clamp(1.5rem, 3vw, 2.4rem);
+        font-weight: 500;
+        letter-spacing: -.04em;
+        line-height: 1.15;
+    }
+
+    blockquote em { color: var(--amber); font-style: normal; }
+
+    .footer .wrap {
+        display: grid;
+        grid-template-columns: minmax(0, .8fr) minmax(0, 1.2fr);
+        gap: clamp(2rem, 5vw, 4rem);
+        align-items: start;
+    }
+
+    .footer-mark {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+    }
+
+    .footer-mark svg {
+        width: 64px;
+        height: 64px;
+        color: var(--amber);
+        flex: none;
+    }
+
+    .footer h2 {
+        max-width: none;
+        font-size: clamp(3rem, 7vw, 5.5rem);
+        letter-spacing: -.05em;
+        line-height: .9;
+    }
+
+    .links {
+        display: grid;
+        margin-top: .4rem;
+    }
+
+    .links a {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 1.5rem;
+        padding: .82rem 0;
+        border-bottom: 1px solid var(--line);
+        color: var(--text);
+        text-decoration: none;
+        transition: color .18s ease;
+    }
+
+    .links a:hover .link-name { color: var(--amber); }
+
+    .links a .link-name { color: var(--text); font-size: .98rem; }
+
+    .links a .link-path {
+        color: var(--muted);
+        font-family: var(--mono);
+        font-size: .68rem;
+        letter-spacing: .02em;
+        text-align: right;
+    }
+
+    .footer-note {
+        grid-column: 1 / -1;
+        margin-top: 2.5rem;
+        padding-top: 1rem;
+        border-top: 1px solid var(--line);
+        color: var(--muted);
+        font-family: var(--mono);
+        font-size: .68rem;
+        letter-spacing: .04em;
+        line-height: 1.7;
+    }
+
+    .hud {
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        z-index: 60;
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        padding: .55rem clamp(1rem, 3vw, 2rem);
+        border-top: 1px solid rgba(35, 42, 53, .8);
+        background: rgba(15, 17, 21, .92);
+        color: var(--muted);
+        font-family: var(--mono);
+        font-size: .64rem;
+        letter-spacing: .08em;
+        backdrop-filter: blur(12px);
+    }
+
+    .hud-count { color: var(--text); white-space: nowrap; }
+    .hud-count .total { color: var(--muted); }
+
+    .hud-progress {
+        flex: 1;
+        height: 2px;
+        overflow: hidden;
+        background: var(--line);
+    }
+
+    .hud-progress span {
+        display: block;
+        width: 0;
+        height: 100%;
+        background: linear-gradient(90deg, var(--teal), var(--amber));
+        transition: width .15s linear;
+    }
+
+    .hud-hint {
+        display: none;
+        white-space: nowrap;
+    }
+
+    .dots {
+        position: fixed;
+        right: clamp(.55rem, 1.4vw, 1.1rem);
+        top: 50%;
+        z-index: 60;
+        display: flex;
+        flex-direction: column;
+        gap: .5rem;
+        padding: .35rem;
+        transform: translateY(-50%);
+    }
+
+    .dot {
+        position: relative;
+        width: 18px;
+        height: 18px;
+        padding: 5px;
+        border: 0;
+        border-radius: 50%;
+        background: transparent;
+        cursor: pointer;
+        transition: transform .18s ease;
+    }
+
+    .dot::before {
+        position: absolute;
+        inset: 5px;
+        border: 1px solid var(--muted);
+        border-radius: 50%;
+        content: "";
+        transition: background .18s ease, border-color .18s ease;
+    }
+
+    .dot:hover::before { border-color: var(--amber); }
+
+    .dot[aria-current="true"] { transform: scale(1.25); }
+
+    .dot[aria-current="true"]::before {
+        border-color: var(--amber);
+        background: var(--amber);
+    }
+
+    @media (min-width: 900px) {
+        .hud-hint { display: block; }
+    }
+
+    @media (max-height: 560px) {
+        .dots { display: none; }
+    }
+
+    @media (min-width: 900px) and (prefers-reduced-motion: no-preference) {
+        html { scroll-snap-type: y proximity; }
+        .slide { scroll-snap-align: start; }
+    }
+
+    @media (max-width: 900px) {
+        .slide {
+            align-items: flex-start;
+            padding-top: 5.5rem;
+        }
+
+        .hero .wrap,
+        .footer .wrap {
+            grid-template-columns: 1fr;
+            gap: 2.5rem;
+        }
+
+        .hero .equation { max-width: 34rem; }
+
+        .grid.two,
+        .grid.three,
+        .principles,
+        .compare,
+        .boundaries {
+            grid-template-columns: 1fr;
+        }
+
+        .principles { gap: 1.5rem; }
+
+        .topbar-section { display: none; }
+        .dots { display: none; }
+        h2 { max-width: 100%; }
+
+        .g10 {
+            grid-template-columns: 1fr;
+        }
+
+        .g10-arrow {
+            justify-self: start;
+            transform: rotate(90deg);
+        }
+
+        .links a { align-items: flex-start; }
+        .links a span { text-align: right; }
+    }
+
+    @media (max-width: 380px) {
+        .brand-sub { display: none; }
+    }
+
+    @media (max-width: 560px) {
+        .slide {
+            padding-right: 1rem;
+            padding-left: 1rem;
+        }
+
+        h1 { font-size: clamp(3.4rem, 20vw, 5rem); }
+
+        .lead { font-size: 1.05rem; }
+
+        figure.code pre {
+            padding: .85rem;
+            font-size: .72rem;
+        }
+
+        .chips { gap: .45rem; }
+        .chip { font-size: .64rem; }
+
+        .hud { gap: .6rem; padding: .5rem .75rem; }
+        .hud-hint { display: none; }
+
+        .footer-note { margin-top: 1.5rem; }
+    }
+
+    @media (max-height: 720px) and (min-width: 900px) {
+        .slide {
+            padding-top: 5rem;
+            padding-bottom: 4rem;
+        }
+
+        h2 { font-size: clamp(1.8rem, 3.6vw, 2.8rem); }
+        figure.code pre { font-size: .76rem; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        html { scroll-behavior: auto; scroll-snap-type: none; }
+
+        *, *::before, *::after {
+            transition-duration: .01ms !important;
+            animation-duration: .01ms !important;
+            animation-iteration-count: 1 !important;
+        }
+    }
+
+    @media print {
+        @page { size: A4; margin: 14mm; }
+
+        :root {
+            --bg: #fff;
+            --bg-soft: #f7f7f7;
+            --panel: #f5f5f5;
+            --text: #111;
+            --muted: #555;
+            --amber: #7a4a00;
+            --teal: #0f5f57;
+            --line: #ccc;
+            --line-soft: #ddd;
+            --code: #f5f5f5;
+            --green: #3f5f2f;
+            --num: #6f4a20;
+        }
+
+        html, body {
+            background: #fff;
+            color: #111;
+            print-color-adjust: exact;
+            -webkit-print-color-adjust: exact;
+        }
+
+        .topbar,
+        .hud,
+        .dots,
+        .skip,
+        .print-btn,
+        .hint { display: none !important; }
+
+        .slide {
+            display: block;
+            min-height: auto;
+            height: auto;
+            padding: 0 0 2rem;
+            border-bottom: 1px solid #ddd;
+            break-after: page;
+            page-break-after: always;
+        }
+
+        .slide:last-of-type {
+            border-bottom: 0;
+            break-after: auto;
+            page-break-after: auto;
+        }
+
+        .slide::before,
+        .slide::after { display: none; }
+
+        .wrap { width: 100%; max-width: none; }
+
+        h1 { font-size: 48pt; }
+        h2 { max-width: none; font-size: 24pt; }
+        .lead, .sub { color: #333; }
+
+        .card,
+        .g10-box,
+        .flow-step .box {
+            background: #f5f5f5;
+            border-color: #ccc;
+        }
+
+        .rules li,
+        .boundary li,
+        .callout,
+        .chip,
+        table.type-table td {
+            color: #333;
+        }
+
+        .hero .wrap,
+        .footer .wrap,
+        .grid.two,
+        .grid.three,
+        .principles,
+        .compare,
+        .boundaries {
+            display: block;
+        }
+
+        .grid > *,
+        .compare > *,
+        .principle,
+        .boundary {
+            margin-bottom: 1rem;
+        }
+
+        .card, figure.code, .equation, .callout, blockquote {
+            break-inside: avoid;
+            page-break-inside: avoid;
+        }
+
+        figure.code pre {
+            overflow: visible;
+            color: #111;
+            background: #f5f5f5;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        figure.code { background: #f5f5f5; }
+
+        .table-wrap { overflow: visible; }
+
+        table.type-table td:first-child { color: #0f5f57; }
+
+        a {
+            color: inherit;
+            text-decoration: underline;
+        }
+
+        .kw { color: #7a4a00; }
+        .ty, .self { color: #0f5f57; }
+        .st { color: #3f5f2f; }
+        .nu { color: #6f4a20; }
+        .dim { color: #555; }
+
+        :not(pre) > code {
+            border-color: #ccc;
+            background: #f0f0f0;
+            color: #111;
+        }
+    }
+</style>
+</head>
+<body>
+<a class="skip" href="#deck">К содержанию</a>
+
+<header class="topbar">
+    <a class="brand" href="#s1" aria-label="Strizh, к началу">
+        <svg viewBox="0 0 48 48" fill="none" aria-hidden="true">
+            <path d="M24 3.5 L34 19.5 L24 44.5 L14 19.5 Z" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"/>
+            <path d="M24 3.5 L24 31" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+            <circle cx="24" cy="36.5" r="2.4" fill="#6fb3a8"/>
+        </svg>
+        <span>Strizh</span>
+        <span class="brand-sub">0.2 preview</span>
+    </a>
+    <span class="topbar-section" id="sectionLabel">00 · Strizh</span>
+    <button class="print-btn" id="printBtn" type="button" hidden>Печать / PDF</button>
+</header>
+
+<main id="deck" tabindex="-1">
+    <section class="slide hero" id="s1" data-title="Strizh" data-section="00 · Strizh">
+        <div class="wrap">
+            <div class="hero-main">
+                <div class="hero-mark">
+                    <svg viewBox="0 0 48 48" fill="none" aria-hidden="true">
+                        <path d="M24 3.5 L34 19.5 L24 44.5 L14 19.5 Z" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"/>
+                        <path d="M24 3.5 L24 31" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+                        <circle cx="24" cy="36.5" r="2.4" fill="#6fb3a8"/>
+                    </svg>
+                    <span class="hero-kicker">прикладной язык · рабочее имя</span>
+                </div>
+                <h1>Strizh</h1>
+                <p class="lead">Go-рантайм и вся экосистема. Hare-подобный синтаксис. Sum types. Структурная конкурентность блоками.</p>
+                <div class="chips">
+                    <span class="chip"><span class="chip-dot"></span>0.2 preview · компилятор, форматтер, LSP</span>
+                    <span class="chip amber"><span class="chip-dot"></span>G10 · готово</span>
+                </div>
+                <p class="hint js-only">← → ↑ ↓ · Space · PageUp / PageDown · P — печать</p>
+            </div>
+            <aside class="equation" aria-label="Формула Strizh">
+                <span class="eq-caption">уравнение языка</span>
+                <div class="eq-line"><span class="eq-term">Go runtime</span></div>
+                <div class="eq-op">+</div>
+                <div class="eq-line"><span class="eq-term">Hare-подобный синтаксис</span></div>
+                <div class="eq-op">+</div>
+                <div class="eq-line"><span class="eq-term">sum types</span></div>
+                <div class="eq-op">+</div>
+                <div class="eq-line"><span class="eq-term">scoped parallelism</span></div>
+                <div class="eq-rule"></div>
+                <div class="eq-result">Strizh</div>
+            </aside>
+        </div>
+    </section>
+
+    <section class="slide" id="s2" data-title="Проблема" data-section="01 · Проблема">
+        <div class="wrap">
+            <p class="kicker">01 · Проблема</p>
+            <h2 class="wide">Go-экосистема без Go-церемоний.</h2>
+            <p class="sub">Strizh не заменяет Go. Он даёт другой фасад для тех же библиотек: меньше форм, меньше шума, больше намерения в коде.</p>
+            <div class="grid three">
+                <article class="card">
+                    <span class="num">01</span>
+                    <h3>Ошибки — значения</h3>
+                    <p><code>T or error</code> и три формы <code>or</code>. Никаких исключений, <code>try</code> и <code>catch</code>.</p>
+                </article>
+                <article class="card">
+                    <span class="num">02</span>
+                    <h3>Конкурентность — блок</h3>
+                    <p><code>par</code>, <code>par for … limit</code>, <code>within</code>. Никаких <code>go</code>, <code>chan</code>, <code>select</code>, <code>async</code>/<code>await</code>.</p>
+                </article>
+                <article class="card">
+                    <span class="num">03</span>
+                    <h3>Go — напрямую</h3>
+                    <p>Тот же <code>use</code>, те же Go-типы и интерфейсы. Никакого отдельного FFI-слоя и ручных адаптеров.</p>
+                </article>
+            </div>
+            <p class="callout">В прикладном коде нет видимого <code>context</code>. Нет «цвета функций». Нет <code>unsafe</code>.</p>
+        </div>
+    </section>
+
+    <section class="slide" id="s3" data-title="Принципы" data-section="02 · Принципы">
+        <div class="wrap">
+            <p class="kicker">02 · Принципы</p>
+            <h2 class="wide">Меньше механизмов — меньше способов сделать одно и то же.</h2>
+            <div class="principles">
+                <article class="principle">
+                    <span class="num">01</span>
+                    <h3>Язык приложений</h3>
+                    <p>Не системный язык: нет <code>unsafe</code>, арен и C-backend. Задача — приложения, а не ядро ОС.</p>
+                </article>
+                <article class="principle">
+                    <span class="num">02</span>
+                    <h3>Значения и срезы</h3>
+                    <p><code>T[]</code>, <code>T[N]</code>, <code>map[K, V]</code>, <code>append</code>. GC и Go speed; без ручного управления памятью.</p>
+                </article>
+                <article class="principle">
+                    <span class="num">03</span>
+                    <h3>Один способ</h3>
+                    <p>Нет <code>:=</code>, <code>switch</code>, UFCS, <code>export</code>, методов снаружи типа. Один способ — меньше выбора.</p>
+                </article>
+                <article class="principle">
+                    <span class="num">04</span>
+                    <h3>Минимум синтаксиса</h3>
+                    <p>Каркас: <code>var</code>, <code>;</code>, точка, <code>or</code>, <code>match</code>, <code>par</code>, <code>within</code>. Остальное — библиотеки.</p>
+                </article>
+                <article class="principle">
+                    <span class="num">05</span>
+                    <h3>Sum types закрыты</h3>
+                    <p>Enum sealed. <code>match</code> исчерпывающий. Компилятор знает, что вариантов больше нет.</p>
+                </article>
+                <article class="principle">
+                    <span class="num">06</span>
+                    <h3>FFI без адаптеров</h3>
+                    <p>Go-имена остаются Go-именами. <code>use</code> и есть граница.</p>
+                </article>
+            </div>
+            <p class="callout teal">Цель — не заменить Go. Цель — убрать из прикладного кода всё, что не является задачей.</p>
+        </div>
+    </section>
+
+    <section class="slide" id="s4" data-title="Синтаксис: каркас" data-section="03 · Синтаксис">
+        <div class="wrap">
+            <p class="kicker">03 · Синтаксис</p>
+            <h2>Каркас: импорты, значения, формы типов.</h2>
+            <p class="sub">Точка выбирает, скобки вызывают. Тип — в значении; <code>var</code> всегда с initializer.</p>
+            <div class="grid two">
+                <div class="stack">
+                    <figure class="code">
+                        <figcaption><span>импорт</span><span class="badge">Go + локальные</span></figcaption>
+                        <pre><code><span class="kw">use</span> fmt;
+<span class="kw">use</span> <span class="st">"./lib"</span> <span class="kw">as</span> lib;
+<span class="kw">use</span> <span class="st">"charm.land/bubbletea/v2"</span> <span class="kw">as</span> tea;</code></pre>
+                    </figure>
+                    <figure class="code">
+                        <figcaption><span>main.str</span><span class="badge teal">значения</span></figcaption>
+                        <pre><code><span class="kw">use</span> fmt;
+
+<span class="kw">const</span> MaxUsers = <span class="nu">100</span>;
+
+<span class="kw">type</span> Point = <span class="kw">struct</span> {
+    x: <span class="ty">f64</span>,
+    y: <span class="ty">f64</span>,
+};
+
+<span class="kw">fn</span> main() <span class="ty">void</span> <span class="kw">or</span> <span class="ty">error</span> = {
+    <span class="kw">var</span> n = <span class="nu">42</span>;
+    <span class="kw">var</span> xs = <span class="ty">i32</span>[] {<span class="nu">1</span>, <span class="nu">2</span>, <span class="nu">3</span>};
+    <span class="kw">var</span> grid = <span class="ty">i32</span>[<span class="nu">4</span>] {};
+    <span class="kw">var</span> names = <span class="kw">map</span>[<span class="ty">str</span>, <span class="ty">u64</span>] {};
+    <span class="kw">var</span> p = &amp;Point { x = <span class="nu">1.0</span>, y = <span class="nu">2.0</span> };
+
+    fmt.Println(n, xs, grid, names, p) <span class="kw">or</span> <span class="kw">return</span>;
+};</code></pre>
+                    </figure>
+                </div>
+                <div class="stack">
+                    <div class="card">
+                        <h3>Формы типов</h3>
+                        <div class="table-wrap">
+                            <table class="type-table">
+                                <thead>
+                                    <tr><th>Форма</th><th>Смысл</th></tr>
+                                </thead>
+                                <tbody>
+                                    <tr><td>T[]</td><td>срез</td></tr>
+                                    <tr><td>T[N]</td><td>массив на N</td></tr>
+                                    <tr><td>T[U]</td><td>generic-применение</td></tr>
+                                    <tr><td>map[K, V]</td><td>map</td></tr>
+                                    <tr><td>*T</td><td>указатель</td></tr>
+                                    <tr><td>fn(A) R</td><td>функция</td></tr>
+                                    <tr><td>T or error</td><td>результат с ошибкой</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <p class="callout teal"><code>T[]</code> — и срез, и лист. Отдельного <code>Vec</code> нет: растёт через <code>append</code>.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="slide" id="s5" data-title="Синтаксис: структуры" data-section="03 · Синтаксис">
+        <div class="wrap">
+            <p class="kicker">03 · Синтаксис</p>
+            <h2>Данные и методы живут вместе.</h2>
+            <p class="sub">Поля и методы — внутри типа. Получатель всегда <code>*T</code> и никогда не пишется в сигнатуре.</p>
+            <div class="grid two">
+                <figure class="code">
+                    <figcaption><span>buffer.str</span><span class="badge">struct · self</span></figcaption>
+                    <pre><code><span class="kw">type</span> Buffer = <span class="kw">struct</span> {
+    data: <span class="ty">u8</span>[],
+    name: <span class="ty">str</span>,
+
+    <span class="kw">fn</span> Write(p: <span class="ty">u8</span>[]) <span class="ty">int</span> <span class="kw">or</span> <span class="ty">error</span> = {
+        data = append(data, p...);
+        <span class="kw">return</span> len(p);
+    };
+
+    <span class="kw">fn</span> WithName(name: <span class="ty">str</span>) *Buffer = {
+        <span class="self">self</span>.name = name;
+        <span class="kw">return</span> <span class="self">self</span>;
+    };
+};</code></pre>
+                </figure>
+                <div class="stack">
+                    <div class="card">
+                        <h3>Правила</h3>
+                        <ul class="rules">
+                            <li><code>self</code> — неявный <code>*T</code>; в сигнатуре его нет.</li>
+                            <li>Поля доступны по имени. <code>self.field</code> — когда имя перекрыто.</li>
+                            <li>Метод нельзя добавить снаружи типа; override и embedding нет.</li>
+                            <li>Value receiver нет. Чтение по значению — свободная функция.</li>
+                        </ul>
+                    </div>
+                    <figure class="code">
+                        <figcaption><span>чтение по значению</span><span class="badge teal">free function</span></figcaption>
+                        <pre><code><span class="kw">fn</span> nameOf(b: Buffer) <span class="ty">str</span> = {
+    <span class="kw">return</span> b.name;
+};</code></pre>
+                    </figure>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="slide" id="s6" data-title="Синтаксис: sum types" data-section="03 · Синтаксис">
+        <div class="wrap">
+            <p class="kicker">03 · Синтаксис</p>
+            <h2>Sum type, который действительно закрыт.</h2>
+            <p class="sub">Enum — sealed-тип. <code>match</code> обязан покрыть все варианты; <code>_</code> для enum не нужен.</p>
+            <div class="grid two">
+                <figure class="code">
+                    <figcaption><span>shape.str</span><span class="badge">sealed enum</span></figcaption>
+                    <pre><code><span class="kw">type</span> Shape = <span class="kw">enum</span> {
+    Circle { radius: <span class="ty">f64</span> },
+    Rect { w: <span class="ty">f64</span>, h: <span class="ty">f64</span> },
+    Empty,
+};</code></pre>
+                </figure>
+                <figure class="code">
+                    <figcaption><span>area</span><span class="badge teal">exhaustive match</span></figcaption>
+                    <pre><code><span class="kw">fn</span> area(s: <span class="ty">Shape</span>) <span class="ty">f64</span> = {
+    <span class="kw">return</span> <span class="kw">match</span> (s) {
+    <span class="kw">case</span> Circle { radius } =&gt; <span class="nu">3.14159</span> * radius * radius;
+    <span class="kw">case</span> Rect { w, h } =&gt; w * h;
+    <span class="kw">case</span> Empty =&gt; <span class="nu">0.0</span>;
+    };
+};</code></pre>
+                </figure>
+            </div>
+            <p class="callout">Вариант без полей — <code>Empty,</code>. Конструктор — <code>Shape.Circle { radius = 2.0 }</code>. <code>_</code> для enum не нужен: <code>match</code> обязан покрыть все варианты.</p>
+        </div>
+    </section>
+
+    <section class="slide" id="s7" data-title="Синтаксис: ошибки и defer" data-section="03 · Синтаксис">
+        <div class="wrap">
+            <p class="kicker">03 · Синтаксис</p>
+            <h2>Ошибка — значение. <code>or</code> — форма обращения с ним.</h2>
+            <p class="sub">Никаких исключений. <code>defer</code> привязан к блоку, а не к функции: цикл не течёт.</p>
+            <div class="grid two">
+                <div class="stack">
+                    <figure class="code">
+                        <figcaption><span>read</span><span class="badge">T or error</span></figcaption>
+                        <pre><code><span class="kw">use</span> os;
+
+<span class="kw">fn</span> read(path: <span class="ty">str</span>) <span class="ty">u8</span>[] <span class="kw">or</span> <span class="ty">error</span> = {
+    <span class="kw">var</span> f = os.Open(path) <span class="kw">or</span> <span class="kw">return</span>;
+    defer f.Close();
+
+    <span class="kw">var</span> buf = <span class="ty">u8</span>[<span class="nu">4096</span>] {};
+    <span class="kw">var</span> n = f.Read(buf[:]) <span class="kw">or</span> <span class="kw">return</span>;
+    <span class="kw">return</span> buf[:n];
+};</code></pre>
+                    </figure>
+                    <div class="card">
+                        <h3>Три формы <code>or</code></h3>
+                        <ul class="rules">
+                            <li><code>call() or return;</code> — вернуть ошибку наверх.</li>
+                            <li><code>call() or err { ... };</code> — обработать здесь; <code>err</code> — значение ошибки.</li>
+                            <li><code>call() or panic("...");</code> — упасть с сообщением.</li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="stack">
+                    <figure class="code">
+                        <figcaption><span>block defer</span><span class="badge teal">на выходе из блока</span></figcaption>
+                        <pre><code><span class="kw">if</span> (has(cache, key)) {
+    mu.Lock();
+    defer mu.Unlock();
+    <span class="kw">return</span> cache[key];
+};</code></pre>
+                    </figure>
+                    <p class="callout teal"><code>defer</code> в цикле закрывает ресурс на каждой итерации, а не копит дескрипторы до конца функции. <code>or return</code> и паника тоже проходят через defer.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="slide" id="s8" data-title="Синтаксис: generics" data-section="03 · Синтаксис">
+        <div class="wrap">
+            <p class="kicker">03 · Синтаксис</p>
+            <h2>Generic без новых скобок. Пока без constraints.</h2>
+            <p class="sub">Параметры — в <code>[...]</code> после имени. На вызове типы выводятся; явные аргументы — когда без них никак.</p>
+            <div class="grid two">
+                <figure class="code">
+                    <figcaption><span>Stack</span><span class="badge">generic type</span></figcaption>
+                    <pre><code><span class="kw">type</span> Stack[Item] = <span class="kw">struct</span> {
+    data: Item[],
+
+    <span class="kw">fn</span> Push(x: Item) <span class="ty">void</span> = {
+        data = append(data, x);
+    };
+
+    <span class="kw">fn</span> Len() <span class="ty">int</span> = {
+        <span class="kw">return</span> len(data);
+    };
+};
+
+<span class="kw">var</span> s = Stack[<span class="ty">i32</span>] {};</code></pre>
+                </figure>
+                <figure class="code">
+                    <figcaption><span>Map</span><span class="badge teal">generic function</span></figcaption>
+                    <pre><code><span class="kw">fn</span> Map[In, Out](xs: In[], f: <span class="kw">fn</span>(In) Out) Out[] = {
+    <span class="kw">var</span> out = Out[] {};
+    <span class="kw">for</span> (<span class="kw">var</span> x <span class="kw">in</span> xs) {
+        out = append(out, f(x));
+    };
+    <span class="kw">return</span> out;
+};
+
+<span class="kw">var</span> xs = <span class="ty">i32</span>[] {<span class="nu">1</span>, <span class="nu">2</span>, <span class="nu">3</span>};
+<span class="kw">var</span> ys = Map(xs, <span class="kw">fn</span>(x) =&gt; x * <span class="nu">2</span>);</code></pre>
+                </figure>
+            </div>
+            <p class="callout">Ограничения (<code>comparable</code>, numeric) — в <code>GAPS.md</code>. В 0.2 их нет: операцию, которой нужен constraint, отвергнет Go.</p>
+        </div>
+    </section>
+
+    <section class="slide" id="s9" data-title="0.2: списки результатов" data-section="04 · Новое в 0.2">
+        <div class="wrap">
+            <p class="kicker">04 · Новое в 0.2</p>
+            <h2>Списки результатов — не tuple.</h2>
+            <p class="sub">Результаты — это форма вызова, а не значение. Нельзя положить в переменную, проиндексировать или передать как аргумент.</p>
+            <div class="compare">
+                <figure class="code">
+                    <figcaption><span>0.1 · через struct</span><span class="badge">было</span></figcaption>
+                    <pre><code><span class="kw">type</span> Pair = <span class="kw">struct</span> {
+    left: <span class="ty">i32</span>,
+    right: <span class="ty">i32</span>,
+};
+
+<span class="kw">fn</span> pair() Pair = {
+    <span class="kw">return</span> Pair { left = <span class="nu">3</span>, right = <span class="nu">7</span> };
+};</code></pre>
+                </figure>
+                <figure class="code">
+                    <figcaption><span>0.2 · список</span><span class="badge teal">стало</span></figcaption>
+                    <pre><code><span class="kw">fn</span> pair() <span class="ty">i32</span>, <span class="ty">i32</span> = {
+    <span class="kw">return</span> <span class="nu">3</span>, <span class="nu">7</span>;
+};
+
+<span class="kw">var</span> a, b = pair();</code></pre>
+                </figure>
+            </div>
+            <div class="grid two">
+                <div class="card">
+                    <h3>Синтаксис</h3>
+                    <ul class="rules">
+                        <li>В объявлении — через запятую: <code>fn f() A, B or error = { ... };</code></li>
+                        <li>В типе функции — в скобках: <code>fn(i32) (str, bool)</code>.</li>
+                        <li><code>T or error</code> — сахар для последнего <code>error</code>.</li>
+                    </ul>
+                </div>
+                <div class="card">
+                    <h3>Чего нет</h3>
+                    <ul class="rules teal">
+                        <li>Нет tuple-типов и tuple-значений.</li>
+                        <li>Нет индексации <code>p[0]</code> и вложения в аргументы.</li>
+                        <li>Нет «вернуть пару» как одно значение.</li>
+                    </ul>
+                </div>
+            </div>
+            <figure class="code mt">
+                <figcaption><span>parse</span><span class="badge">результат + error</span></figcaption>
+                <pre><code><span class="kw">use</span> strconv;
+
+<span class="kw">fn</span> parse(s: <span class="ty">str</span>) <span class="ty">int</span>, <span class="ty">bool</span> <span class="kw">or</span> <span class="ty">error</span> = {
+    <span class="kw">var</span> n = strconv.Atoi(s) <span class="kw">or</span> <span class="kw">return</span>;
+    <span class="kw">return</span> n, <span class="kw">true</span>;
+};</code></pre>
+            </figure>
+        </div>
+    </section>
+
+    <section class="slide" id="s10" data-title="0.2: type-паттерны" data-section="04 · Новое в 0.2">
+        <div class="wrap">
+            <p class="kicker">04 · Новое в 0.2</p>
+            <h2>Type-паттерны для <code>any</code> и интерфейсов.</h2>
+            <p class="sub">Для enum остаются variant-паттерны. Для открытых типов появляется <code>as</code>, проверка без связывания и <code>else</code>.</p>
+            <div class="grid two">
+                <figure class="code">
+                    <figcaption><span>describe</span><span class="badge teal">0.2</span></figcaption>
+                    <pre><code><span class="kw">use</span> <span class="st">"charm.land/bubbletea/v2"</span> <span class="kw">as</span> tea;
+
+<span class="kw">fn</span> describe(msg: <span class="ty">tea.Msg</span>) <span class="ty">str</span> = {
+    <span class="kw">return</span> <span class="kw">match</span> (msg) {
+    <span class="kw">case</span> <span class="ty">tea.KeyPressMsg</span> <span class="kw">as</span> k =&gt; <span class="st">"key: "</span> + k.String();
+    <span class="kw">case</span> <span class="ty">tea.WindowSizeMsg</span> =&gt; <span class="st">"resize"</span>;
+    <span class="kw">else</span> =&gt; <span class="st">"other"</span>;
+    };
+};</code></pre>
+                </figure>
+                <div class="stack">
+                    <div class="card">
+                        <h3>Три формы</h3>
+                        <ul class="rules">
+                            <li><code>case T as x =&gt; ...</code> — проверить тип и связать значение.</li>
+                            <li><code>case T =&gt; ...</code> — проверить тип без связывания.</li>
+                            <li><code>else =&gt; ...</code> — значение по умолчанию для открытого типа; вместо <code>case _</code>.</li>
+                        </ul>
+                    </div>
+                    <div class="card">
+                        <h3>Границы</h3>
+                        <ul class="rules teal">
+                            <li>Только для <code>any</code> и интерфейсов. Enum — по-прежнему <code>case Circle { radius }</code>.</li>
+                            <li><code>any</code> открыт: исчерпываемость невозможна, <code>else</code> обязателен.</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            <p class="callout">0.1: type switch нет; <code>tea.Msg</code> обрабатывается только через Go-колбэки. 0.2: <code>match</code> с <code>as</code>, проверкой типа и <code>else</code>.</p>
+        </div>
+    </section>
+
+    <section class="slide" id="s11" data-title="0.2: nil и self" data-section="04 · Новое в 0.2">
+        <div class="wrap">
+            <p class="kicker">04 · Новое в 0.2</p>
+            <h2><code>nil</code> без типа, <code>self</code> без шума.</h2>
+            <p class="sub">Голый <code>nil</code> — там, где ожидаемый тип уже известен. <code>self</code> остаётся неявным получателем-указателем.</p>
+            <div class="grid two">
+                <div class="stack">
+                    <figure class="code">
+                        <figcaption><span>nil</span><span class="badge teal">0.2</span></figcaption>
+                        <pre><code><span class="kw">fn</span> stop() <span class="ty">tea.Cmd</span> = {
+    <span class="kw">return</span> <span class="kw">nil</span>;
+};
+
+<span class="kw">type</span> Model = <span class="kw">struct</span> {
+    <span class="kw">fn</span> Update(msg: <span class="ty">tea.Msg</span>) <span class="ty">tea.Model</span>, <span class="ty">tea.Cmd</span> = {
+        <span class="kw">return</span> <span class="self">self</span>, <span class="kw">nil</span>;
+    };
+};
+
+<span class="kw">var</span> cmd = <span class="kw">nil</span>[<span class="ty">tea.Cmd</span>];</code></pre>
+                    </figure>
+                    <div class="card">
+                        <h3>Правило</h3>
+                        <ul class="rules">
+                            <li>Известен ожидаемый тип — можно <code>nil</code>: <code>return nil;</code>, <code>return self, nil;</code>, аргумент.</li>
+                            <li>Неоднозначно — <code>nil[T]</code>: <code>var cmd = nil[tea.Cmd];</code>.</li>
+                            <li><code>nil</code> — для указателей, срезов, map, функций и интерфейсов.</li>
+                        </ul>
+                        <p class="footnote">0.1: <code>return nil[tea.Cmd];</code> → 0.2: <code>return nil;</code></p>
+                    </div>
+                </div>
+                <div class="stack">
+                    <figure class="code">
+                        <figcaption><span>self</span><span class="badge">остаётся</span></figcaption>
+                        <pre><code><span class="kw">type</span> User = <span class="kw">struct</span> {
+    Name: <span class="ty">str</span>,
+    age: <span class="ty">u32</span>,
+
+    <span class="kw">fn</span> WithAge(age: <span class="ty">u32</span>) *User = {
+        <span class="self">self</span>.age = age;
+        <span class="kw">return</span> <span class="self">self</span>;
+    };
+
+    <span class="kw">fn</span> Rename(Name: <span class="ty">str</span>) <span class="ty">void</span> = {
+        <span class="self">self</span>.Name = Name;
+    };
+};</code></pre>
+                    </figure>
+                    <div class="card">
+                        <h3>Правило</h3>
+                        <ul class="rules teal">
+                            <li><code>self</code> — неявный <code>*T</code>; в сигнатуре не пишется.</li>
+                            <li>Поля доступны без него; <code>self</code> нужен, когда возвращаешь/передаёшь получателя или есть перекрытие имени.</li>
+                        </ul>
+                        <p class="footnote">0.1 → 0.2: без изменений.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="slide" id="s12" data-title="Конкурентность: par" data-section="05 · Конкурентность">
+        <div class="wrap">
+            <p class="kicker">05 · Конкурентность</p>
+            <h2>Конкурентность — блок, а не протокол.</h2>
+            <p class="sub">Внутри <code>par</code> — независимые операторы. На <code>}</code> блок дожидается всех; утечь нечему.</p>
+            <div class="grid two">
+                <figure class="code">
+                    <figcaption><span>dashboard.str</span><span class="badge teal">par</span></figcaption>
+                    <pre><code><span class="kw">fn</span> loadDashboard(id: <span class="ty">u64</span>) Dashboard <span class="kw">or</span> <span class="ty">error</span> = {
+    <span class="kw">var</span> users = User[] {};
+    <span class="kw">var</span> orders = Order[] {};
+
+    <span class="kw">par</span> {
+        users = loadUsers(id) <span class="kw">or</span> <span class="kw">return</span>;
+        orders = loadOrders(id) <span class="kw">or</span> <span class="kw">return</span>;
+    };
+
+    <span class="kw">return</span> Dashboard { users = users, orders = orders };
+};</code></pre>
+                </figure>
+                <div class="stack">
+                    <div class="card">
+                        <h3>Правила</h3>
+                        <ul class="rules">
+                            <li><code>or return</code>, <code>or panic</code> или паника в одном операторе отменяет остальные; побеждает ошибка с низшим ord.</li>
+                            <li>Захваченное состояние читается параллельно. Писать можно в переменную с одним писателем, если её не читает другой оператор, в слот итерации или через <code>sync</code>/<code>atomic</code>.</li>
+                            <li>Запись через указатель, в map и в <code>self</code> запрещена. <code>defer</code>, <code>within</code> и <code>or panic</code> внутри работают: у каждого воркера свой defer stack и recovery boundary.</li>
+                            <li>Вложенный <code>par</code> разрешён.</li>
+                        </ul>
+                    </div>
+                    <p class="callout teal">Никаких <code>go</code>, <code>chan</code>, <code>select</code>. Никакого <code>context</code> в сигнатурах. <code>par</code> создаёт и отменяет контекст сам. Core G1–G9 закрыт; динамический оракул — <code>go build -race</code> (G11).</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="slide" id="s13" data-title="Конкурентность: par for и within" data-section="05 · Конкурентность">
+        <div class="wrap">
+            <p class="kicker">05 · Конкурентность</p>
+            <h2><code>par for</code> с потолком. <code>within</code> с дедлайном.</h2>
+            <p class="sub"><code>limit</code> ограничивает ширину цикла. <code>within</code> — область работы целиком. Оба прячут <code>context</code>.</p>
+            <div class="grid two">
+                <figure class="code">
+                    <figcaption><span>fetchAll</span><span class="badge teal">par for + within</span></figcaption>
+                    <pre><code><span class="kw">const</span> MaxURLs = <span class="nu">64</span>;
+
+<span class="kw">fn</span> fetchAll(urls: <span class="ty">str</span>[]) Page[] <span class="kw">or</span> <span class="ty">error</span> = {
+    <span class="kw">var</span> pages = Page[MaxURLs] {};
+
+    <span class="kw">within</span> <span class="nu">30s</span> {
+        <span class="kw">par</span> <span class="kw">for</span> (<span class="kw">var</span> i = <span class="nu">0</span>; i &lt; len(urls); i += <span class="nu">1</span>) <span class="kw">limit</span> <span class="nu">16</span> {
+            pages[i] = fetch(urls[i]) <span class="kw">or</span> <span class="kw">return</span>;
+        };
+    };
+
+    <span class="kw">return</span> pages[:len(urls)];
+};</code></pre>
+                </figure>
+                <div class="stack">
+                    <div class="card">
+                        <h3>Правила</h3>
+                        <ul class="rules">
+                            <li><code>limit N</code> — потолок одновременных итераций; по умолчанию — <code>GOMAXPROCS</code>.</li>
+                            <li>Ошибка отменяет остальные; возвращается ошибка с наименьшим индексом. Для map индекса нет: побеждает первая дошедшая.</li>
+                            <li><code>within</code> работает и без <code>par</code>; вложенность берёт минимальный дедлайн; внутри воркера дедлайн не меняет соседей.</li>
+                            <li><code>par for (var x in xs)</code> работает так же.</li>
+                            <li><code>defer</code> блочный: в обычном цикле ресурс закрывается на итерации; внутри <code>par</code> — свой stack воркера, очистка на его выходе.</li>
+                        </ul>
+                    </div>
+                    <p class="callout">Порядок результатов определяет вызывающий код, а не порядок завершения. <code>limit</code> и <code>within</code> — раздельные конструкции.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="slide" id="s14" data-title="Go interop: Bubble Tea" data-section="06 · Go interop">
+        <div class="wrap">
+            <p class="kicker">06 · Go interop</p>
+            <h2>Bubble Tea без Go-адаптера.</h2>
+            <p class="sub"><code>tea.Model</code> — обычный Go-интерфейс. <code>*Model</code> реализует его структурно: три метода, ни одного <code>ctx</code>.</p>
+            <div class="grid two">
+                <figure class="code">
+                    <figcaption><span>main.str</span><span class="badge teal">0.2 · bubbletea/v2.1.0</span></figcaption>
+                    <pre><code><span class="kw">use</span> <span class="st">"charm.land/bubbletea/v2"</span> <span class="kw">as</span> tea;
+
+<span class="kw">type</span> Model = <span class="kw">struct</span> {
+    <span class="kw">fn</span> Init() <span class="ty">tea.Cmd</span> = { <span class="kw">return</span> <span class="kw">nil</span>; };
+
+    <span class="kw">fn</span> Update(msg: <span class="ty">tea.Msg</span>) <span class="ty">tea.Model</span>, <span class="ty">tea.Cmd</span> = {
+        <span class="kw">match</span> (msg) {
+        <span class="kw">case</span> <span class="ty">tea.KeyPressMsg</span> <span class="kw">as</span> k =&gt; {
+            <span class="kw">if</span> (k.String() == <span class="st">"q"</span>) {
+                <span class="kw">return</span> <span class="self">self</span>, <span class="kw">fn</span>() <span class="ty">tea.Msg</span> =&gt; tea.Quit();
+            };
+        };
+        <span class="kw">else</span> =&gt; {};
+        };
+        <span class="kw">return</span> <span class="self">self</span>, <span class="kw">nil</span>;
+    };
+
+    <span class="kw">fn</span> View() <span class="ty">tea.View</span> = { <span class="kw">return</span> tea.NewView(<span class="st">"press q to quit"</span>); };
+};
+
+<span class="kw">fn</span> main() <span class="ty">void</span> <span class="kw">or</span> <span class="ty">error</span> = {
+    <span class="kw">var</span> m = Model {};
+    <span class="kw">var</span> p = tea.NewProgram(&amp;m);
+    p.Run() <span class="kw">or</span> <span class="kw">return</span>;
+};</code></pre>
+                </figure>
+                <div class="stack">
+                    <div class="card">
+                        <h3>Что здесь важно</h3>
+                        <ul class="rules">
+                            <li><code>Update</code> возвращает <code>tea.Model, tea.Cmd</code> — список результатов.</li>
+                            <li><code>tea.KeyPressMsg as k</code> — type-паттерн по <code>tea.Msg</code>.</li>
+                            <li><code>return self, nil;</code> — голый <code>nil</code> для известного <code>tea.Cmd</code>.</li>
+                            <li><code>tea.NewProgram(&amp;m)</code> — методы указательные, <code>*Model</code> реализует интерфейс.</li>
+                        </ul>
+                    </div>
+                    <p class="callout">В 0.2 ручной Go-адаптер не нужен. Если методу нужен hidden context, G10 генерирует non-ctx обёртку с точной Go-сигнатурой; отдельного adapter-файла нет.</p>
+                    <p class="footnote">Фоновые таймеры и IO для Bubble Tea не нужны: <code>Cmd</code> запускает сам <code>tea.Program</code>.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="slide" id="s15" data-title="G10: скрытый context" data-section="06 · Go interop">
+        <div class="wrap">
+            <p class="kicker">06 · Go interop</p>
+            <h2>G10: context, которого нет в коде.</h2>
+            <p class="sub"><code>par</code> и <code>within</code> — фича языка. Context остаётся внутри кодогена, даже когда метод реализует Go-интерфейс.</p>
+            <div class="g10">
+                <div class="g10-col">
+                    <span class="g10-label">Strizh</span>
+                    <div class="g10-box">fn Update(msg: tea.Msg) tea.Model, tea.Cmd<span>один метод, без ctx</span></div>
+                    <div class="g10-box">тело с par / within<span>без ctx в сигнатуре</span></div>
+                </div>
+                <div class="g10-arrow" aria-hidden="true">→</div>
+                <div class="g10-col">
+                    <span class="g10-label">zz_strizh.go</span>
+                    <div class="g10-box">Update(...) — публичная обёртка<span>точная Go-сигнатура</span></div>
+                    <div class="g10-box">_s_Model_Update_ctx(self, _s_ctx, …) — тело<span>здесь живут par / within</span></div>
+                </div>
+            </div>
+            <div class="grid two mt">
+                <div class="card">
+                    <h3>Что делает кодоген</h3>
+                    <ul class="rules">
+                        <li>Генерирует обёртку с точной Go-сигнатурой.</li>
+                        <li>Внутренняя версия получает скрытый <code>ctx</code> и вызывает <code>par</code>/<code>within</code>.</li>
+                        <li>Обёртка скрыта в <code>zz_strizh.go</code>; пользователь пишет один метод.</li>
+                    </ul>
+                </div>
+                <div class="card">
+                    <h3>Что это открывает</h3>
+                    <ul class="rules teal">
+                        <li><code>par</code>/<code>within</code> внутри методов Go-интерфейсов.</li>
+                        <li>Включая <code>tea.Model.Update</code>.</li>
+                        <li>В app-коде <code>ctx</code> не появляется.</li>
+                    </ul>
+                </div>
+            </div>
+            <p class="callout">Статус: <strong>0.2, реализовано</strong>. Публичная обёртка сохраняет точную Go-сигнатуру, внутренняя ctx-версия держит `par`/`within`. Через границу пакета или function value дедлайн не переносится.</p>
+        </div>
+    </section>
+
+    <section class="slide" id="s16" data-title="Внутренняя кухня" data-section="07 · Внутри">
+        <div class="wrap">
+            <p class="kicker">07 · Внутри</p>
+            <h2>От <code>.str</code> до Go binary.</h2>
+            <p class="sub">Один компилятор: build, run, check, test, fmt и lsp используют один parser и один sema.</p>
+            <div class="grid two">
+                <div class="flow">
+                    <div class="flow-step"><span class="flow-num">01</span><div class="box">lexer <span>токены, комментарии</span></div></div>
+                    <div class="flow-arrow" aria-hidden="true">↓</div>
+                    <div class="flow-step"><span class="flow-num">02</span><div class="box">parser <span>AST</span></div></div>
+                    <div class="flow-arrow" aria-hidden="true">↓</div>
+                    <div class="flow-step"><span class="flow-num">03</span><div class="box">sema <span>имена, or, par/context</span></div></div>
+                    <div class="flow-arrow" aria-hidden="true">↓</div>
+                    <div class="flow-step"><span class="flow-num">04</span><div class="box">gen <span>Go source</span></div></div>
+                    <div class="flow-arrow" aria-hidden="true">↓</div>
+                    <div class="flow-step"><span class="flow-num">05</span><div class="box">go build <span>binary</span></div></div>
+                </div>
+                <div class="stack">
+                    <div class="card">
+                        <h3>zz_strizh.go</h3>
+                        <p>Сгенерированный Go рядом с исходниками; форматируется <code>go/format</code>.</p>
+                    </div>
+                    <div class="card">
+                        <h3>.strizh/runtime</h3>
+                        <p>Support-пакет: <code>DeferStack</code>, asserts, <code>has</code>, помощники <code>par</code>.</p>
+                    </div>
+                    <div class="card">
+                        <h3>//line</h3>
+                        <p>Ошибки Go и stack traces показывают <code>.str</code>, а не сгенерированный файл.</p>
+                    </div>
+                    <div class="card">
+                        <h3>LSP</h3>
+                        <p>Тот же parser/sema плюс typecheck на open/save: диагностика, hover, definition, completion.</p>
+                    </div>
+                    <div class="card">
+                        <h3>typecheck</h3>
+                        <p><code>internal/typecheck</code>: Go в памяти, <code>go/packages</code> + overlay, позиции через <code>//line</code>. Работает в <code>strizh check</code> и LSP.</p>
+                    </div>
+                </div>
+            </div>
+            <p class="callout">Sema проверяет Strizh-правила и method sets; <code>strizh check</code> прогоняет Go typecheck через <code>internal/typecheck</code>. <code>go build</code> остаётся финальным оракулом.</p>
+            <p class="footnote"><a href="internals.html">Подробнее — internals.html →</a></p>
+        </div>
+    </section>
+
+    <section class="slide" id="s17" data-title="Границы 0.2" data-section="08 · Границы">
+        <div class="wrap">
+            <p class="kicker">08 · Границы</p>
+            <h2>0.2 — вертикальный срез, а не весь gap list.</h2>
+            <p class="sub">Списки результатов, type patterns, bare nil, G10, typecheck и par core. Всё остальное — осознанно позже.</p>
+            <div class="boundaries">
+                <div class="boundary do">
+                    <h3>В 0.2 закрыто</h3>
+                    <ul>
+                        <li>Списки результатов в объявлениях и типах функций.</li>
+                        <li>Type-паттерны и <code>else</code> для <code>any</code>/интерфейсов.</li>
+                        <li>Голый <code>nil</code> там, где тип известен.</li>
+                        <li>G10: обёртки для скрытого context.</li>
+                        <li>G1–G9: panic recovery, per-worker defer/within, write rules.</li>
+                        <li>G26/G27: typecheck в <code>check</code>/LSP, method sets.</li>
+                        <li>Conformance-тесты на новые формы.</li>
+                        <li>Bubble Tea smoke: Init/Update/View.</li>
+                        <li><code>self</code> остаётся неявным.</li>
+                    </ul>
+                </div>
+                <div class="boundary dont">
+                    <h3>Сознательно не делаем</h3>
+                    <ul>
+                        <li>Полный <code>GAPS.md</code>.</li>
+                        <li>Tuple-значения и tuple-типы.</li>
+                        <li>Generic constraints.</li>
+                        <li>Generic enums.</li>
+                        <li>Variadics.</li>
+                        <li>Expression-level <code>or</code>.</li>
+                        <li>LSP refactors: rename, references, actions.</li>
+                    </ul>
+                </div>
+            </div>
+            <blockquote>Решение для всего — <em>решение ни для чего.</em></blockquote>
+            <p class="callout">0.2 preview — вертикальный срез. Он не обещает 1.0 и не закрывает GAPS целиком.</p>
+        </div>
+    </section>
+
+    <section class="slide footer" id="s18" data-title="Ссылки" data-section="09 · Ссылки">
+        <div class="wrap">
+            <div>
+                <div class="footer-mark">
+                    <svg viewBox="0 0 48 48" fill="none" aria-hidden="true">
+                        <path d="M24 3.5 L34 19.5 L24 44.5 L14 19.5 Z" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"/>
+                        <path d="M24 3.5 L24 31" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+                        <circle cx="24" cy="36.5" r="2.4" fill="#6fb3a8"/>
+                    </svg>
+                    <h2>Strizh</h2>
+                </div>
+                <p class="sub">Прикладной язык с рантаймом Go. 0.2 preview — multiple results, type patterns, G10, typecheck и par core; остальное осознанно позже.</p>
+                <p class="footnote">Strizh — рабочее имя.<br>0.2 preview — текущая линия; 1.0 не обещан.</p>
+            </div>
+            <nav class="links" aria-label="Документы">
+                <a href="../../design/SPEC.md"><span class="link-name">Спецификация</span><span class="link-path">design/SPEC.md</span></a>
+                <a href="../../design/SYNTAX.md"><span class="link-name">Синтаксис v0</span><span class="link-path">design/SYNTAX.md</span></a>
+                <a href="../../design/GAPS.md"><span class="link-name">Gap list</span><span class="link-path">design/GAPS.md</span></a>
+                <a href="../../design/IMPL.md"><span class="link-name">Как устроен компилятор</span><span class="link-path">design/IMPL.md</span></a>
+                <a href="../../README.md"><span class="link-name">README</span><span class="link-path">README.md</span></a>
+                <a href="internals.html"><span class="link-name">Внутренняя кухня</span><span class="link-path">internals.html</span></a>
+                <a href="cheatsheet.html"><span class="link-name">Шпаргалка</span><span class="link-path">cheatsheet.html</span></a>
+            </nav>
+            <p class="footer-note">Собрано по design/*.md. Ссылки относительные.</p>
+        </div>
+    </section>
+</main>
+
+<nav class="dots" id="dots" aria-label="Слайды" hidden></nav>
+
+<div class="hud" id="hud" hidden>
+    <span class="hud-count"><span id="cur">01</span> <span class="total">/ <span id="total">19</span></span></span>
+    <div class="hud-progress" id="progress" role="progressbar" aria-label="Прогресс презентации" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+        <span id="bar"></span>
+    </div>
+    <span class="hud-hint">← → · Space · P</span>
+</div>
+
+<script>
+(() => {
+    const doc = document.documentElement;
+    doc.classList.add('js');
+
+    const slides = Array.from(document.querySelectorAll('.slide'));
+    const dots = document.getElementById('dots');
+    const hud = document.getElementById('hud');
+    const cur = document.getElementById('cur');
+    const total = document.getElementById('total');
+    const bar = document.getElementById('bar');
+    const progress = document.getElementById('progress');
+    const sectionLabel = document.getElementById('sectionLabel');
+    const printBtn = document.getElementById('printBtn');
+    const motion = window.matchMedia('(prefers-reduced-motion: reduce)');
+
+    let current = -1;
+    const pad = (n) => String(n).padStart(2, '0');
+
+    total.textContent = pad(slides.length);
+    hud.hidden = false;
+    printBtn.hidden = false;
+
+    slides.forEach((slide, i) => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'dot';
+        button.setAttribute('aria-label', `Слайд ${pad(i + 1)}: ${slide.dataset.title || ''}`);
+        button.title = slide.dataset.title || '';
+        button.addEventListener('click', () => go(i));
+        dots.append(button);
+    });
+    dots.hidden = false;
+
+    const dotEls = Array.from(dots.children);
+
+    function go(index) {
+        const next = Math.max(0, Math.min(slides.length - 1, index));
+        slides[next].scrollIntoView({
+            behavior: motion.matches ? 'auto' : 'smooth',
+            block: 'start'
+        });
+        if (history.replaceState) {
+            try {
+                history.replaceState(null, '', '#' + slides[next].id);
+            } catch (error) {}
+        }
+    }
+
+    function setCurrent(index) {
+        if (index === current) return;
+        current = index;
+        cur.textContent = pad(index + 1);
+        if (sectionLabel) sectionLabel.textContent = slides[index].dataset.section || '';
+        dotEls.forEach((dot, i) => {
+            if (i === index) dot.setAttribute('aria-current', 'true');
+            else dot.removeAttribute('aria-current');
+        });
+        document.title = (slides[index].dataset.title || 'Strizh') === 'Strizh'
+            ? 'Strizh — язык приложений на рантайме Go'
+            : `${slides[index].dataset.title} — Strizh`;
+    }
+
+    function update() {
+        const marker = window.scrollY + window.innerHeight * 0.33;
+        let index = 0;
+
+        for (let i = 0; i < slides.length; i++) {
+            const top = slides[i].getBoundingClientRect().top + window.scrollY;
+            if (top <= marker) index = i;
+        }
+
+        setCurrent(index);
+
+        const max = document.documentElement.scrollHeight - window.innerHeight;
+        const pct = max > 0 ? Math.min(100, Math.max(0, (window.scrollY / max) * 100)) : 0;
+        bar.style.width = `${pct}%`;
+        if (progress) progress.setAttribute('aria-valuenow', String(Math.round(pct)));
+    }
+
+    let queued = false;
+    function onScroll() {
+        if (queued) return;
+        queued = true;
+        requestAnimationFrame(() => {
+            queued = false;
+            update();
+        });
+    }
+
+    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', onScroll);
+
+    const nextKeys = new Set(['ArrowRight', 'ArrowDown', 'PageDown', ' ']);
+    const prevKeys = new Set(['ArrowLeft', 'ArrowUp', 'PageUp']);
+
+    document.addEventListener('keydown', (event) => {
+        if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey) return;
+
+        const target = event.target;
+        if (!(target instanceof Element)) return;
+        if (target.closest('input, textarea, select, [contenteditable="true"]')) return;
+        if (target.closest('button, a') && (event.key === ' ' || event.key === 'Enter')) return;
+        if (target.closest('pre') && (event.key === 'ArrowLeft' || event.key === 'ArrowRight')) return;
+
+        if (nextKeys.has(event.key)) {
+            event.preventDefault();
+            go(current + 1);
+        } else if (prevKeys.has(event.key)) {
+            event.preventDefault();
+            go(current - 1);
+        } else if (event.key === 'Home') {
+            event.preventDefault();
+            go(0);
+        } else if (event.key === 'End') {
+            event.preventDefault();
+            go(slides.length - 1);
+        } else if (event.key === 'p' || event.key === 'P') {
+            event.preventDefault();
+            window.print();
+        }
+    });
+
+    printBtn.addEventListener('click', () => window.print());
+
+    const initial = slides.findIndex((slide) => `#${slide.id}` === location.hash);
+    update();
+
+    if (initial > 0) {
+        requestAnimationFrame(() => {
+            slides[initial].scrollIntoView({ behavior: 'auto', block: 'start' });
+            setCurrent(initial);
+            update();
+        });
+    }
+
+    window.addEventListener('hashchange', () => {
+        const index = slides.findIndex((slide) => `#${slide.id}` === location.hash);
+        if (index >= 0) {
+            slides[index].scrollIntoView({
+                behavior: motion.matches ? 'auto' : 'smooth',
+                block: 'start'
+            });
+        }
+    });
+
+    document.querySelectorAll('pre').forEach((pre) => {
+        pre.tabIndex = 0;
+    });
+})();
+</script>
+</body>
+</html>

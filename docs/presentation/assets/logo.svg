@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-labelledby="strizh-logo-title">
+  <title id="strizh-logo-title">Strizh</title>
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M19 53 L45 13" stroke="#e0a458" stroke-width="3.2"/>
+    <path d="M45.4 12.6 L50 7 L47.2 15.8 Z" fill="#e0a458" stroke="none"/>
+    <path d="M41.5 19 C35.6 19.4 31.6 21.9 28.7 27" stroke="#6fb3a8" stroke-width="2.4"/>
+    <path d="M37 26 C32.1 26.4 28.6 28.9 26.1 33.5" stroke="#6fb3a8" stroke-width="2.4"/>
+    <path d="M32.5 33 C28.6 33.4 26 35.4 24 39" stroke="#6fb3a8" stroke-width="2.4"/>
+    <path d="M28 40 C25.1 40.4 23 42 21.5 44.5" stroke="#6fb3a8" stroke-width="2.4"/>
+    <path d="M12 54 C24 58 40 57 52 50" stroke="#6fb3a8" stroke-width="2.2" opacity=".75"/>
+  </g>
+</svg>

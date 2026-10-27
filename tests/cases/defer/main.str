@@ -1,0 +1,15 @@
+use fmt;
+
+fn main() void or error = {
+    fmt.Println("start") or return;
+    if (true) {
+        defer fmt.Println("block");
+        fmt.Println("in block") or return;
+    };
+    fmt.Println("after") or return;
+    for (var i = 0; i < 2; i += 1) {
+        defer fmt.Println("iter", i);
+        fmt.Println("body", i) or return;
+    };
+    fmt.Println("end") or return;
+};

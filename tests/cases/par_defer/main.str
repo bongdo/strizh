@@ -1,0 +1,32 @@
+use fmt;
+use errors;
+
+fn fail() void or error = {
+    return errors.New("stop");
+};
+
+fn work() void or error = {
+    par {
+        {
+            defer fmt.Println("cleanup");
+            fail() or return;
+            fmt.Println("unreachable") or return;
+        };
+    };
+    fmt.Println("unreachable") or return;
+};
+
+fn main() void or error = {
+    par {
+        {
+            defer fmt.Println("d1");
+            defer fmt.Println("d2");
+            fmt.Println("body") or return;
+        };
+    };
+    var caught = 0;
+    work() or err {
+        caught = 1;
+    };
+    fmt.Println("caught", caught) or return;
+};

@@ -1,0 +1,5 @@
+use fmt;
+
+fn main() void or error = {
+    fmt.Println("hello") or return;
+};

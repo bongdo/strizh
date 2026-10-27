@@ -1,0 +1,18 @@
+use fmt;
+
+fn add(a: i32, b: i32) i32 = {
+    return a + b;
+};
+
+fn main() void or error = {
+    fmt.Println(add(2, 2)) or return;
+};
+
+test "arithmetic" {
+    assert_eq(add(2, 2), 4);
+    assert(add(1, 1) == 2);
+};
+
+test "strings" {
+    assert_eq("a" + "b", "ab");
+};

@@ -1,0 +1,37 @@
+use fmt;
+use strconv;
+
+type Stack[Item] = struct {
+    data: Item[],
+
+    fn Push(x: Item) void = {
+        data = append(data, x);
+    };
+
+    fn Pop() Item = {
+        var x = data[len(data) - 1];
+        data = data[:len(data) - 1];
+        return x;
+    };
+
+    fn Len() int = {
+        return len(data);
+    };
+};
+
+fn Map[In, Out](xs: In[], f: fn(In) Out) Out[] = {
+    var out = Out[] {};
+    for (var x in xs) {
+        out = append(out, f(x));
+    };
+    return out;
+};
+
+fn main() void or error = {
+    var s = Stack[i32] {};
+    s.Push(1);
+    s.Push(2);
+    fmt.Println(s.Len(), s.Pop(), s.Len()) or return;
+    var words = Map[i32, str](i32[] {1, 2, 3}, fn(x: i32) str => strconv.Itoa(int(x)));
+    fmt.Println(words) or return;
+};

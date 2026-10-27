@@ -1,0 +1,7 @@
+i32
+point
+point-ptr
+other
+bool
+other
+path:x

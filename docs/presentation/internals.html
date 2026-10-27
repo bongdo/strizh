@@ -1,0 +1,1068 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<meta name="description" content="Как устроен компилятор Strizh: lexer, parser, AST, sema, codegen в Go, hidden context, LSP, runtime и conformance-тесты.">
+<title>Strizh — внутренняя кухня компилятора</title>
+<style>
+:root {
+  --bg: #0f1115;
+  --text: #e8e6e1;
+  --amber: #e0a458;
+  --teal: #6fb3a8;
+  --muted: #8b949e;
+  --code: #161b22;
+  --line: #232a36;
+  --panel: #141820;
+  --panel-2: #181d26;
+  --max: 1240px;
+  --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 16px/1.65 var(--sans);
+  -webkit-font-smoothing: antialiased;
+}
+a { color: var(--teal); text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px; }
+a:hover { color: #9ed7ce; }
+.wrap { max-width: var(--max); margin: 0 auto; padding: 0 28px; }
+.skip {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  background: var(--amber);
+  color: #15110a;
+  padding: 10px 14px;
+  z-index: 20;
+}
+.skip:focus { left: 12px; top: 12px; }
+.hero {
+  border-bottom: 1px solid var(--line);
+  background:
+    radial-gradient(900px 360px at 78% -10%, rgba(224, 164, 88, 0.10), transparent 70%),
+    radial-gradient(700px 300px at 12% 0%, rgba(111, 179, 168, 0.08), transparent 70%);
+  padding: 46px 0 34px;
+}
+.crumbs { display: flex; flex-wrap: wrap; gap: 18px; font-size: 0.86rem; margin-bottom: 30px; }
+.crumbs a { text-decoration: none; color: var(--muted); }
+.crumbs a:hover { color: var(--teal); }
+.eyebrow {
+  margin: 0;
+  color: var(--amber);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+h1 {
+  margin: 10px 0 18px;
+  max-width: 20ch;
+  font-size: clamp(2.1rem, 5vw, 3.55rem);
+  line-height: 1.04;
+  letter-spacing: -0.045em;
+  font-weight: 750;
+}
+.lead { max-width: 70ch; margin: 0; color: #c9c6c0; font-size: 1.08rem; }
+.badges { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 22px; }
+.badge {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 0.2em 0.75em;
+  font-size: 0.74rem;
+  line-height: 1.5;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.badge.amber { border-color: rgba(224, 164, 88, 0.45); color: var(--amber); background: rgba(224, 164, 88, 0.07); }
+.badge.teal { border-color: rgba(111, 179, 168, 0.45); color: var(--teal); background: rgba(111, 179, 168, 0.07); }
+.badge.muted { color: var(--muted); background: rgba(139, 148, 158, 0.06); }
+.layout {
+  display: grid;
+  grid-template-columns: minmax(200px, 250px) minmax(0, 1fr);
+  gap: 56px;
+  padding-top: 40px;
+  padding-bottom: 84px;
+}
+.toc {
+  position: sticky;
+  top: 22px;
+  align-self: start;
+  max-height: calc(100vh - 44px);
+  overflow: auto;
+  padding-right: 8px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line) transparent;
+}
+.toc-title {
+  margin: 0 0 12px;
+  color: var(--muted);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+.toc ol { list-style: none; margin: 0; padding: 0; counter-reset: toc; }
+.toc li { counter-increment: toc; margin: 0; }
+.toc a {
+  display: block;
+  padding: 7px 8px 7px 0;
+  color: var(--muted);
+  text-decoration: none;
+  font-size: 0.9rem;
+  line-height: 1.35;
+  border-left: 2px solid transparent;
+  padding-left: 10px;
+}
+.toc a::before {
+  content: counter(toc, decimal-leading-zero) "  ";
+  color: #536070;
+  font-variant-numeric: tabular-nums;
+  font-size: 0.78em;
+}
+.toc a:hover, .toc a.active { color: var(--text); border-left-color: var(--amber); }
+.toc a.active::before { color: var(--amber); }
+.toc-actions { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--line); }
+.print-btn {
+  appearance: none;
+  border: 1px solid rgba(224, 164, 88, 0.5);
+  background: rgba(224, 164, 88, 0.08);
+  color: var(--amber);
+  border-radius: 6px;
+  padding: 8px 12px;
+  font: 600 0.82rem var(--sans);
+  cursor: pointer;
+  width: 100%;
+}
+.print-btn:hover { background: rgba(224, 164, 88, 0.14); }
+.print-fallback { margin: 10px 0 0; color: var(--muted); font-size: 0.78rem; line-height: 1.45; }
+.toc-top { display: block; margin-top: 12px; font-size: 0.8rem; color: var(--muted); text-decoration: none; }
+.toc-top:hover { color: var(--teal); }
+main { min-width: 0; }
+section { padding: 4px 0 38px; margin-bottom: 34px; border-bottom: 1px solid var(--line); scroll-margin-top: 22px; }
+section:last-of-type { border-bottom: 0; margin-bottom: 0; }
+h2 {
+  margin: 0 0 16px;
+  font-size: clamp(1.4rem, 2.4vw, 1.8rem);
+  line-height: 1.2;
+  letter-spacing: -0.025em;
+}
+h2 .num {
+  color: var(--amber);
+  font-size: 0.72em;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  margin-right: 0.55em;
+  font-variant-numeric: tabular-nums;
+}
+h3 { margin: 28px 0 10px; font-size: 1.05rem; line-height: 1.35; color: var(--amber); letter-spacing: -0.01em; }
+h4 { margin: 22px 0 8px; font-size: 0.95rem; color: var(--text); }
+p { margin: 0 0 14px; max-width: 78ch; }
+ul, ol { margin: 0 0 16px; padding-left: 1.35em; max-width: 80ch; }
+li { margin: 0.3em 0; }
+li > ul, li > ol { margin-top: 0.3em; margin-bottom: 0.3em; }
+strong { color: #fff; font-weight: 650; }
+em { color: #d8d3cb; }
+code {
+  font-family: var(--mono);
+  font-size: 0.87em;
+  background: var(--code);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 0.08em 0.34em;
+  white-space: break-spaces;
+}
+pre {
+  margin: 14px 0 20px;
+  padding: 16px 18px;
+  overflow: auto;
+  background: var(--code);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-size: 0.86rem;
+  line-height: 1.55;
+  tab-size: 4;
+}
+pre code {
+  display: block;
+  padding: 0;
+  border: 0;
+  background: none;
+  font-size: inherit;
+  line-height: inherit;
+  white-space: pre;
+}
+table { width: 100%; border-collapse: collapse; margin: 14px 0 22px; font-size: 0.92rem; }
+th, td { padding: 9px 12px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--line); }
+th {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+tbody tr:hover td { background: rgba(255, 255, 255, 0.018); }
+td code { white-space: nowrap; }
+.note {
+  margin: 20px 0;
+  padding: 14px 18px;
+  border-left: 3px solid var(--amber);
+  border-radius: 0 6px 6px 0;
+  background: rgba(224, 164, 88, 0.055);
+}
+.note.teal { border-left-color: var(--teal); background: rgba(111, 179, 168, 0.055); }
+.note.warn { border-left-color: #d97757; background: rgba(217, 119, 87, 0.065); }
+.note p:last-child { margin-bottom: 0; }
+.note-title { display: block; margin-bottom: 4px; color: var(--amber); font-weight: 700; font-size: 0.78rem; letter-spacing: 0.06em; text-transform: uppercase; }
+.note.teal .note-title { color: var(--teal); }
+.note.warn .note-title { color: #e58d70; }
+.diagram {
+  margin: 22px 0 18px;
+  padding: 12px;
+  overflow-x: auto;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+.diagram svg { display: block; width: 100%; min-width: 820px; height: auto; }
+.diagram figcaption { margin: 8px 4px 2px; color: var(--muted); font-size: 0.78rem; line-height: 1.45; }
+svg text { font-family: var(--sans); fill: var(--text); }
+svg .lane { fill: #11151b; stroke: var(--line); }
+svg .lane-label { fill: var(--muted); font-size: 10.5px; font-weight: 700; letter-spacing: 0.08em; }
+svg .box { fill: var(--code); stroke: #2d3748; stroke-width: 1.2; }
+svg .box-accent { fill: var(--amber); }
+svg .box-title { font-size: 14px; font-weight: 700; }
+svg .box-sub { fill: var(--muted); font-size: 10px; }
+svg .arrow { stroke: var(--teal); stroke-width: 1.5; fill: none; }
+svg .support { stroke: var(--muted); stroke-width: 1.2; stroke-dasharray: 4 4; fill: none; }
+svg .map { stroke: var(--amber); stroke-width: 1.2; stroke-dasharray: 4 4; fill: none; }
+svg .map-label { fill: var(--amber); font-size: 10px; }
+svg .foot { fill: var(--muted); font-size: 10.5px; }
+.grid-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin: 16px 0 20px; }
+.card { padding: 14px 16px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; }
+.card h3, .card h4 { margin-top: 0; }
+.card p:last-child, .card ul:last-child { margin-bottom: 0; }
+.card ul { padding-left: 1.15em; }
+.tag { display: inline-block; padding: 0.05em 0.4em; border-radius: 4px; font: 600 0.7rem var(--mono); letter-spacing: 0.02em; }
+.tag.ok { color: #9ed7ce; background: rgba(111, 179, 168, 0.12); }
+.tag.plan { color: var(--amber); background: rgba(224, 164, 88, 0.12); }
+.tag.part { color: #c9b47f; background: rgba(201, 180, 127, 0.10); }
+.kbd { font: 0.78em var(--mono); border: 1px solid #394354; border-bottom-width: 2px; border-radius: 4px; padding: 0.05em 0.35em; color: #d7dde7; background: #1b212b; }
+footer.site-footer { border-top: 1px solid var(--line); padding: 28px 0 46px; color: var(--muted); font-size: 0.84rem; }
+footer.site-footer p { max-width: 90ch; margin-bottom: 8px; }
+footer.site-footer a { color: var(--teal); }
+@media (max-width: 920px) {
+  .layout { grid-template-columns: 1fr; gap: 26px; padding-top: 26px; }
+  .toc { position: static; max-height: none; order: -1; padding: 0 0 18px; border-bottom: 1px solid var(--line); }
+  .toc ol { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 18px; }
+  .toc a { padding-top: 4px; padding-bottom: 4px; }
+  .toc-actions { display: flex; align-items: center; gap: 14px; border-top: 0; margin-top: 10px; padding-top: 0; }
+  .print-btn { width: auto; }
+  .toc-top { margin-top: 0; }
+}
+@media (max-width: 640px) {
+  .wrap { padding: 0 18px; }
+  .hero { padding-top: 30px; }
+  .lead { font-size: 1rem; }
+  .toc ol { grid-template-columns: 1fr; }
+  .grid-2 { grid-template-columns: 1fr; }
+  table { display: block; overflow-x: auto; }
+  th, td { padding: 8px 10px; }
+  pre { padding: 13px 14px; font-size: 0.82rem; }
+}
+@media print {
+  :root {
+    --bg: #fff;
+    --text: #15181d;
+    --amber: #8a5a12;
+    --teal: #0b5f57;
+    --muted: #555d66;
+    --code: #f5f5f3;
+    --line: #d7d7d2;
+    --panel: #fafaf8;
+    --panel-2: #f6f6f3;
+  }
+  html { scroll-behavior: auto; }
+  body { background: #fff; color: #15181d; font-size: 10.5pt; line-height: 1.5; }
+  .wrap { max-width: none; padding: 0; }
+  .hero { padding: 0 0 18px; background: none; border-bottom: 1px solid var(--line); }
+  .crumbs, .toc, .print-btn, .print-fallback, .toc-actions, .skip { display: none !important; }
+  .layout { display: block; padding: 22px 0 0; }
+  h1 { font-size: 28pt; max-width: none; }
+  h2 { font-size: 16pt; }
+  h3 { font-size: 11.5pt; }
+  section { border-color: var(--line); margin-bottom: 22px; padding-bottom: 18px; break-inside: auto; }
+  h2, h3, h4 { break-after: avoid; }
+  p, li { max-width: none; }
+  pre, table, .note, .card, .diagram { break-inside: avoid; }
+  pre, code { background: #f5f5f3; border-color: #d7d7d2; }
+  pre { font-size: 8.6pt; overflow: visible; white-space: pre-wrap; }
+  pre code { white-space: pre-wrap; }
+  .diagram svg { min-width: 0; width: 100%; }
+  a { color: #0b5f57; text-decoration: none; }
+  .badge { border-color: #bbb; color: #444; background: none; }
+  .diagram { background: #fff; border-color: #d7d7d2; }
+  svg .lane { fill: #fafafa; stroke: #ddd; }
+  svg .lane-label, svg .box-sub, svg .foot { fill: #555; }
+  svg .box { fill: #fff; stroke: #bbb; }
+  svg .box-title { fill: #15181d; }
+  svg .arrow { stroke: #0b5f57; }
+  svg .support { stroke: #777; }
+  svg .map { stroke: #8a5a12; }
+  svg .map-label { fill: #8a5a12; }
+  footer.site-footer { color: #555; }
+}
+</style>
+</head>
+<body>
+<a class="skip" href="#main">К содержанию</a>
+<header class="hero" id="top">
+  <div class="wrap">
+    <nav class="crumbs" aria-label="Навигация по презентации">
+      <a href="index.html">← К презентации</a>
+      <a href="cheatsheet.html">Шпаргалка</a>
+    </nav>
+    <p class="eyebrow">Strizh · compiler internals</p>
+    <h1>Внутренняя кухня компилятора</h1>
+    <p class="lead">Как <code>.str</code> проходит через lexer, parser, AST и sema, превращается в Go, а потом в обычный бинарник. Заметки по текущему дереву и по тому, что относится к 0.2.</p>
+    <div class="badges">
+      <span class="badge amber">0.2 preview</span>
+      <span class="badge teal">multiple results · type patterns · G10 · par core · typecheck</span>
+      <span class="badge muted">во время рефакторинга сборка может быть красной</span>
+    </div>
+  </div>
+</header>
+
+<div class="wrap layout">
+  <aside class="toc" aria-label="Содержание страницы">
+    <p class="toc-title">Содержание</p>
+    <nav>
+      <ol>
+        <li><a href="#arch">Общая архитектура</a></li>
+        <li><a href="#front">Lexer и parser</a></li>
+        <li><a href="#sema">Sema</a></li>
+        <li><a href="#typecheck">Typecheck</a></li>
+        <li><a href="#gen">Codegen</a></li>
+        <li><a href="#ffi">G10: context на границе Go</a></li>
+        <li><a href="#syntax02">Синтаксис 0.2</a></li>
+        <li><a href="#lsp">LSP</a></li>
+        <li><a href="#runtime">Runtime</a></li>
+        <li><a href="#tests">Тесты</a></li>
+        <li><a href="#limits">Границы</a></li>
+      </ol>
+    </nav>
+    <div class="toc-actions">
+      <button class="print-btn" id="print-btn" type="button" hidden>Печать / PDF</button>
+      <noscript><p class="print-fallback">Для PDF используйте печать браузера: <span class="kbd">Ctrl</span> + <span class="kbd">P</span>.</p></noscript>
+      <a class="toc-top" href="#top">Наверх ↑</a>
+    </div>
+  </aside>
+
+  <main id="main">
+    <section id="arch">
+      <h2><span class="num">01</span>Общая архитектура</h2>
+      <p>Strizh не пишет машинный код сам. Компилятор переводит <code>.str</code> в Go, а сборку делает обычный <code>go build</code>. Поэтому стандартная библиотека Go и сторонние Go-пакеты доступны напрямую, а всё, что Strizh не проверяет, в итоге проверяет компилятор Go.</p>
+
+      <figure class="diagram">
+        <svg viewBox="0 0 1080 400" role="img" aria-labelledby="pipe-title pipe-desc">
+          <title id="pipe-title">Pipeline компилятора Strizh</title>
+          <desc id="pipe-desc">Исходные файлы .str проходят через lexer, parser и AST, затем sema, codegen, go build и превращаются в бинарник. Formatter и LSP используют те же AST и sema. Runtime копируется в .strizh/runtime. Директивы //line возвращают ошибки к исходным строкам.</desc>
+          <defs>
+            <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M0,0 L10,5 L0,10 z" fill="#6fb3a8"/>
+            </marker>
+            <marker id="arrow-amber" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M0,0 L10,5 L0,10 z" fill="#e0a458"/>
+            </marker>
+          </defs>
+
+          <rect class="lane" x="8" y="14" width="1064" height="164" rx="12"/>
+          <text class="lane-label" x="24" y="38">INTERNAL/DRIVER — ОРКЕСТРАЦИЯ СБОРКИ</text>
+
+          <g>
+            <rect class="box" x="20" y="58" width="102" height="96" rx="8"/>
+            <rect class="box-accent" x="20" y="58" width="102" height="3" rx="1.5"/>
+            <text class="box-title" x="71" y="92" text-anchor="middle">.str</text>
+            <text class="box-sub" x="71" y="112" text-anchor="middle">исходники</text>
+          </g>
+          <line class="arrow" x1="122" y1="106" x2="138" y2="106" marker-end="url(#arrow)"/>
+          <g>
+            <rect class="box" x="140" y="58" width="102" height="96" rx="8"/>
+            <text class="box-title" x="191" y="92" text-anchor="middle">lexer</text>
+            <text class="box-sub" x="191" y="112" text-anchor="middle">token.Token</text>
+          </g>
+          <line class="arrow" x1="242" y1="106" x2="258" y2="106" marker-end="url(#arrow)"/>
+          <g>
+            <rect class="box" x="260" y="58" width="102" height="96" rx="8"/>
+            <text class="box-title" x="311" y="92" text-anchor="middle">parser</text>
+            <text class="box-sub" x="311" y="112" text-anchor="middle">ast.File</text>
+          </g>
+          <line class="arrow" x1="362" y1="106" x2="378" y2="106" marker-end="url(#arrow)"/>
+          <g>
+            <rect class="box" x="380" y="58" width="102" height="96" rx="8"/>
+            <text class="box-title" x="431" y="92" text-anchor="middle">AST</text>
+            <text class="box-sub" x="431" y="112" text-anchor="middle">узлы + Span</text>
+          </g>
+          <line class="arrow" x1="482" y1="106" x2="498" y2="106" marker-end="url(#arrow)"/>
+          <g>
+            <rect class="box" x="500" y="58" width="102" height="96" rx="8"/>
+            <text class="box-title" x="551" y="92" text-anchor="middle">sema</text>
+            <text class="box-sub" x="551" y="112" text-anchor="middle">sema.Program</text>
+          </g>
+          <line class="arrow" x1="602" y1="106" x2="618" y2="106" marker-end="url(#arrow)"/>
+          <g>
+            <rect class="box" x="620" y="58" width="102" height="96" rx="8"/>
+            <text class="box-title" x="671" y="92" text-anchor="middle">codegen</text>
+            <text class="box-sub" x="671" y="112" text-anchor="middle">zz_strizh.go</text>
+          </g>
+          <line class="arrow" x1="722" y1="106" x2="738" y2="106" marker-end="url(#arrow)"/>
+          <g>
+            <rect class="box" x="740" y="58" width="102" height="96" rx="8"/>
+            <text class="box-title" x="791" y="92" text-anchor="middle">go build</text>
+            <text class="box-sub" x="791" y="112" text-anchor="middle">Go compiler</text>
+          </g>
+          <line class="arrow" x1="842" y1="106" x2="858" y2="106" marker-end="url(#arrow)"/>
+          <g>
+            <rect class="box" x="860" y="58" width="102" height="96" rx="8"/>
+            <rect class="box-accent" x="860" y="58" width="102" height="3" rx="1.5"/>
+            <text class="box-title" x="911" y="92" text-anchor="middle">binary</text>
+            <text class="box-sub" x="911" y="112" text-anchor="middle">bin/&lt;name&gt;</text>
+          </g>
+
+          <line class="map" x1="71" y1="218" x2="71" y2="158" marker-end="url(#arrow-amber)"/>
+          <g>
+            <rect class="box" x="20" y="218" width="102" height="64" rx="8"/>
+            <text class="box-title" x="71" y="245" text-anchor="middle">//line</text>
+            <text class="box-sub" x="71" y="263" text-anchor="middle">path:line</text>
+          </g>
+
+          <line class="support" x1="431" y1="154" x2="431" y2="218" marker-end="url(#arrow)"/>
+          <g>
+            <rect class="box" x="300" y="218" width="160" height="64" rx="8"/>
+            <text class="box-title" x="380" y="245" text-anchor="middle">format</text>
+            <text class="box-sub" x="380" y="263" text-anchor="middle">канонический .str</text>
+          </g>
+
+          <line class="support" x1="551" y1="154" x2="551" y2="218" marker-end="url(#arrow)"/>
+          <g>
+            <rect class="box" x="500" y="218" width="170" height="64" rx="8"/>
+            <text class="box-title" x="585" y="245" text-anchor="middle">lsp</text>
+            <text class="box-sub" x="585" y="263" text-anchor="middle">stdio JSON-RPC</text>
+          </g>
+
+          <path class="support" d="M 671 154 L 671 190 L 790 190 L 790 218" marker-end="url(#arrow)"/>
+          <g>
+            <rect class="box" x="700" y="218" width="180" height="64" rx="8"/>
+            <text class="box-title" x="790" y="245" text-anchor="middle">runtime/</text>
+            <text class="box-sub" x="790" y="263" text-anchor="middle">→ .strizh/runtime</text>
+          </g>
+
+          <text class="foot" x="20" y="320">Сплошная стрелка — поток сборки. Пунктир — вспомогательные ветки и копирование.</text>
+          <text class="foot" x="20" y="340">//line в сгенерированном Go возвращает ошибки go build к файлам .str.</text>
+          <text class="foot" x="20" y="360">LSP и formatter используют те же AST/Program, но в сборку не входят.</text>
+        </svg>
+        <figcaption>Один проход: драйвер парсит проект, sema строит <code>Program</code>, codegen пишет Go, <code>go build</code> собирает бинарник.</figcaption>
+      </figure>
+
+      <h3>Кто за что отвечает</h3>
+      <table>
+        <thead><tr><th>Пакет</th><th>Роль</th></tr></thead>
+        <tbody>
+          <tr><td><code>internal/driver</code></td><td>точка входа для CLI: ищет <code>strizh.toml</code>, ведёт <code>go.mod</code>, обходит <code>.str</code>, вызывает sema и gen, запускает <code>go build</code>/<code>go test</code>.</td></tr>
+          <tr><td><code>internal/lexer</code>, <code>internal/token</code></td><td>токены, позиции, комментарии, ошибки лексинга.</td></tr>
+          <tr><td><code>internal/parser</code></td><td>рекурсивный спуск, AST, восстановление после ошибок.</td></tr>
+          <tr><td><code>internal/ast</code></td><td>узлы, <code>Span</code>, обход и поиск узла по смещению.</td></tr>
+          <tr><td><code>internal/sema</code></td><td>пакеты, импорты, ссылки, типы, enum, <code>or</code>, <code>par</code>, hidden context.</td></tr>
+          <tr><td><code>internal/gen</code></td><td>Go-текст, <code>//line</code>, форматирование через <code>go/format</code>.</td></tr>
+          <tr><td><code>internal/format</code></td><td>канонический исходник <code>.str</code>.</td></tr>
+          <tr><td><code>internal/lsp</code></td><td>JSON-RPC-сервер по stdio: диагностика, hover, definition, completion, symbols, signature help, formatting.</td></tr>
+          <tr><td><code>runtime/</code></td><td>support-пакет <code>strizhrt</code>, который встраивается в компилятор и копируется в проект.</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Одна сборка по шагам</h3>
+      <ol>
+        <li><code>driver.Open</code> поднимается вверх до каталога с <code>strizh.toml</code>, читает имя, модуль и версию Go.</li>
+        <li>Обход проекта собирает все <code>.str</code> и раскладывает их по относительным каталогам: один каталог — один пакет, корень — <code>package main</code>.</li>
+        <li><code>Project.Check</code> создаёт <code>go.mod</code>, если его нет, и на время проверки пишет <code>zz_strizh_imports.go</code> с blank-импортами, чтобы <code>go/packages</code> мог найти внешние Go-пакеты. Затем вызывается <code>sema.Check</code>.</li>
+        <li><code>gen.Generate</code> пишет по одному <code>zz_strizh.go</code> на пакет, при тестах — <code>zz_strizh_test.go</code>, и копирует runtime в <code>.strizh/runtime/runtime.go</code>.</li>
+        <li><code>go build -o ... .</code> собирает корневой пакет. <code>strizh run</code> кладёт бинарник в <code>.strizh/bin/&lt;name&gt;</code>, обычный <code>strizh build</code> — в <code>bin/&lt;name&gt;</code>.</li>
+        <li>Если Go-компилятор ругается, <code>//line path:line</code> в сгенерированном файле заставляет ошибку указывать на <code>.str</code>, а не на <code>zz_strizh.go</code>.</li>
+      </ol>
+
+      <pre><code>hello/
+  strizh.toml
+  main.str
+  lib/util.str
+  zz_strizh.go
+  .strizh/runtime/runtime.go
+  .strizh/bin/hello</code></pre>
+
+      <div class="note">
+        <span class="note-title">Важно</span>
+        <p>Sema проверяет Strizh-правила — импорты, имена, enum, <code>or</code>, <code>par</code>, context, method sets. <code>strizh check</code> затем прогоняет Go typecheck через <code>internal/typecheck</code>: генерирует Go в памяти и получает диагностику <code>go/packages</code>. Поэтому <code>int + string</code> виден уже в <code>strizh check</code> и LSP, а <code>go build</code> остаётся финальным оракулом для <code>build/run/test</code>.</p>
+      </div>
+    </section>
+
+    <section id="front">
+      <h2><span class="num">02</span>Lexer и parser</h2>
+      <p>Фронтенд намеренно простой: лексер один раз проходит по байтам и выдаёт токены, парсер — рекурсивный спуск с приоритетами для бинарных операторов. Имена, типы и смысл узлов здесь не проверяются: это работа sema.</p>
+
+      <h3>Токены и позиции</h3>
+      <p>Токен — это <code>token.Token{Kind, Lit, Pos, End}</code>. Позиция хранит смещение, строку и колонку. Комментарии не попадают в поток токенов: лексер возвращает их отдельным списком, а парсер складывает в <code>ast.File.Comments</code>. Этого хватает formatter'у, но привязки комментария к объявлению пока нет (G25).</p>
+      <ul>
+        <li>Литералы: целые, дробные, строки, raw-строки в backticks, rune, duration (<code>30s</code>, <code>5m</code>).</li>
+        <li>Идентификаторы — Unicode-буквы, цифры и <code>_</code>; ключевые слова Strizh и Go-слова вроде <code>func</code>/<code>range</code> проверяются отдельно.</li>
+        <li>Операторы и пунктуация: <code>=</code>, <code>==</code>, <code>+=</code>, <code>=&gt;</code>, <code>...</code>, <code>or</code> и остальные.</li>
+        <li>Ошибка лексера — <code>lexer.Error{Pos, Msg}</code>; парсер добавляет свои ошибки и сортирует всё по смещению, максимум 100 штук.</li>
+      </ul>
+
+      <h3>Точка с запятой</h3>
+      <p><code>;</code> — настоящий токен, а не автоматическая вставка. Парсер ожидает его после оператора, объявления и блока, использованного как оператор. Если его нет, появляется ошибка <code>expected ';', found ...</code>, после чего парсер пытается восстановиться до конца оператора или объявления. Поэтому блоки <code>if</code>, <code>for</code>, <code>match</code>, <code>par</code> и <code>within</code> в исходнике тоже закрываются с <code>};</code>.</p>
+      <pre><code>if (ok) {
+    run();
+};
+
+match (shape) {
+case Circle { radius } =&gt; area(radius);
+case Empty =&gt; 0.0;
+};</code></pre>
+
+      <h3>Постфиксные <code>[]</code> и развилка generic/array</h3>
+      <p>Типы наращиваются постфиксно: <code>T[]</code> — срез, <code>T[N]</code> — массив, <code>T[U]</code> — инстанцирование generic-типа. В выражениях <code>x[i]</code> и <code>x[a:b]</code> — это уже индекс и срез. В типовой позиции парсер сначала пробует разобрать список типов, а если не вышло — выражение длины. В выражении <code>x[...]</code> вызов с type args распознаётся только когда за <code>]</code> идёт <code>(</code>, а аргументы похожи на типы: builtin, несколько аргументов или имя с заглавной буквы. Иначе <code>[...]</code> остаётся индексом или срезом. Если в типовой позиции один аргумент оказался константой, sema нормализует <code>GenericType</code> в <code>ArrayType</code>.</p>
+
+      <h3><code>or</code></h3>
+      <p><code>or</code> разбирается только на верхнем уровне выражения: аргументы вызовов, условия и вложенные выражения используют <code>parseExprNoOr</code>. Формы три: <code>or return</code>, <code>or panic(...)</code> и <code>or err { ... }</code>. Sema дополнительно требует, чтобы слева был вызов, возвращающий ошибку, а сам <code>or</code> стоял целиком в инициализаторе, правой части, выражении-операторе или возврате. Вложить его в <code>f(g() or return)</code> нельзя — это G22.</p>
+      <pre><code>var f = os.Open(path) or return;
+os.Remove(path) or panic("cannot remove");
+var n = parse(text) or err {
+    fmt.Println(err) or panic();
+    return 0;
+};</code></pre>
+
+      <h3><code>par</code>, <code>match</code>, <code>defer</code></h3>
+      <ul>
+        <li><code>par { ... }</code> — <code>ParStmt</code> с блоком. <code>par for (...)</code> — тот же <code>ForStmt</code>, но с <code>Par: true</code>; <code>limit</code> остаётся выражением в узле.</li>
+        <li><code>match</code> — <code>MatchExpr</code>. Тело кейса — блок или одно выражение; <code>match</code> считается выражением, только если все кейсы дали выражение. Паттерны пока простые: литерал, имя, вариант с полями; guard'ов и выражений в паттернах нет (G17).</li>
+        <li><code>defer</code> требует вызов, а не произвольное выражение. Область действия — блок; это не Go-дефер на функцию, а запись в <code>DeferStack</code> (см. codegen).</li>
+      </ul>
+
+      <h3>AST</h3>
+      <p>У каждого узла есть <code>Span{Start, End}</code>; <code>End</code> исключающий. Этого достаточно для диагностики, LSP-позиций и <code>//line</code>.</p>
+      <table>
+        <thead><tr><th>Группа</th><th>Узлы</th></tr></thead>
+        <tbody>
+          <tr><td>Верхний уровень</td><td><code>File</code>, <code>Use</code>, <code>FuncDecl</code>, <code>TypeDecl</code>, <code>VarDecl</code>, <code>TestDecl</code></td></tr>
+          <tr><td>Типы</td><td><code>NamedType</code>, <code>SliceType</code>, <code>ArrayType</code>, <code>GenericType</code>, <code>MapType</code>, <code>PointerType</code>, <code>FuncType</code>, <code>InterfaceType</code>, <code>StructType</code>, <code>GoType</code></td></tr>
+          <tr><td>Выражения</td><td><code>Ident</code>, <code>SelectorExpr</code>, <code>CallExpr</code>, <code>IndexExpr</code>, <code>SliceExpr</code>, <code>UnaryExpr</code>, <code>BinaryExpr</code>, <code>CompositeLit</code>, <code>FuncLit</code>, <code>NilLit</code>, <code>MatchExpr</code>, <code>OrExpr</code></td></tr>
+          <tr><td>Операторы</td><td><code>Block</code>, <code>DeclStmt</code>, <code>AssignStmt</code>, <code>ExprStmt</code>, <code>IfStmt</code>, <code>ForStmt</code>, <code>ReturnStmt</code>, <code>DeferStmt</code>, <code>ParStmt</code>, <code>WithinStmt</code>, <code>BreakStmt</code>, <code>ContinueStmt</code></td></tr>
+        </tbody>
+      </table>
+
+      <h3>Ошибки с позициями</h3>
+      <p>Ошибки фронтенда всегда несут <code>token.Pos</code>; драйвер добавляет путь файла. Парсер не бросает исключение и не останавливается на первой ошибке: он восстанавливается до <code>;</code>, <code>}</code> или начала следующего объявления. Несколько реальных сообщений:</p>
+      <pre><code>expected ';', found '}'
+nil requires a type: nil[T]
+match is not exhaustive: missing Rect
+or must be the whole initializer, right side, statement or return value
+writing to total captured from outside par</code></pre>
+      <p>Go-ошибки после сборки указывают на <code>file.str:line: message</code>: <code>//line</code> подменяет файл и строку. Колонки в директиве нет, поэтому разбор ошибок ограничен — это G34.</p>
+    </section>
+
+    <section id="sema">
+      <h2><span class="num">03</span>Sema</h2>
+      <p><code>sema.Check</code> получает разобранные файлы по относительным каталогам и строит <code>Program</code>. Его задача — не проверить все типы, а связать имена, импорты, enum'ы, <code>or</code>, <code>par</code> и hidden context. Всё остальное оставлено Go.</p>
+
+      <h3>Порядок проходов</h3>
+      <ol>
+        <li><code>collect</code> — объявления пакета, поля, методы, варианты enum'ов, проверка имён и конфликтов.</li>
+        <li><code>resolveUses</code> — локальные и Go-импорты, алиасы, проверка конфликтов алиасов.</li>
+        <li><code>loadGo</code> — загрузка Go-пакетов через <code>go/packages</code> с <code>Dir = Root</code>; результаты кэшируются.</li>
+        <li><code>bindImports</code>, <code>checkCycles</code> — привязка <code>types.Package</code> и поиск циклов локальных импортов.</li>
+        <li><code>resolveDecls</code> — сигнатуры функций и типы объявлений; затем тела: <code>checkFuncs</code>, <code>checkTests</code>, <code>checkMain</code>.</li>
+        <li><code>colorContext</code> — fixpoint по вызовам для <code>NeedsCtx</code>.</li>
+        <li><code>finalChecks</code> — например, неиспользованный импорт.</li>
+      </ol>
+
+      <h3>Пакеты и импорты</h3>
+      <p>Корень проекта — <code>"."</code> и <code>package main</code>; остальные ключи — относительные каталоги через слэш. Локальный импорт обязан начинаться с <code>./</code> или <code>../</code> и не может выйти за корень проекта. Go-импорт — это путь без ведущей точки; алиас по умолчанию — последний сегмент пути. Один алиас не может указывать на два разных пакета, а неиспользованный импорт — ошибка. Для внешних Go-пакетов драйвер на время проверки создаёт заглушку с blank-импортами, иначе <code>go/packages</code> не увидит зависимость до первого <code>go mod tidy</code>.</p>
+
+      <h3>Resolve и типы</h3>
+      <p>Ссылки складываются в <code>Ident.Ref</code> и <code>SelectorExpr.Ref</code>: локальная, параметр, глобальная, константа, функция, тип, поле, <code>self</code>, builtin, вариант enum, пакет. Для каждого выражения sema заполняет <code>ExprTypes</code>, для вызова — <code>CallInfo</code> (сколько результатов, есть ли ошибка, нужен ли context). Это же используют hover и completion в LSP.</p>
+      <ul>
+        <li>Локальные типы: alias, struct, enum, interface. Alias не создаёт новый Go-тип.</li>
+        <li>Go-типы приходят из <code>go/types</code> и превращаются в <code>ast.GoType</code> или <code>NamedType</code> с <code>PkgAlias</code>.</li>
+        <li>Generic-параметры ведут себя как <code>any</code>: constraints отсутствуют, операции вроде <code>&lt;</code> или <code>+</code> может отвергнуть уже Go. Generic enum'ы sema запрещает (G16).</li>
+        <li>Явные type arguments вызова пока не резолвятся: codegen печатает их из сырого AST, поэтому hover/completion по ним слабые (G18).</li>
+        <li>Method sets считаются для локальных struct/interface и Go-типов; присваивание, аргумент, return и элемент composite проверяются на позиции в исходнике (G27). Неименуемые сигнатуры — generics, enum-варианты, массивы, function values, variadic — пропускаются и остаются на <code>go build</code>; явный Go <code>context.Context</code> сравнивается как обычный параметр, hidden-ctx с ним не совпадает.</li>
+      </ul>
+
+      <h3>Enum и exhaustiveness</h3>
+      <p>Enum — это интерфейс с маркерным методом и структуры-варианты. Sema проверяет, что вариант существует, не повторяется и что <code>match</code> покрывает все варианты, если нет <code>_</code>. Голое имя варианта должно быть уникальным в проекте: <code>uniqueVariant</code> ищет его по всем пакетам и сообщает о неоднозначности; квалифицированная форма <code>case pkg.Circle</code> разрешена.</p>
+      <pre><code>match (shape) {
+case Circle { radius } =&gt; area(radius);
+case Rect { w, h } =&gt; w * h;
+case Empty =&gt; 0.0;
+};</code></pre>
+      <p>Если вариант пропущен, ошибка будет на позиции <code>match</code>: <code>match is not exhaustive: missing Rect</code>. Для не-enum <code>match</code> работает по литералам, именам и константам; <code>_</code> превращается в <code>default</code>.</p>
+
+      <h3><code>or</code>: что разрешает sema</h3>
+      <p>Sema не разворачивает <code>or</code> в код — это делает codegen. Здесь проверяется форма: слева вызов, у вызова <code>CallInfo.HasError</code>, сам <code>or</code> стоит на верхнем уровне, а <code>or return</code> допустим только в функции, которая возвращает ошибку. <code>or</code> поддерживает не более одного не-error результата; <code>or err { ... }</code> заводит <code>err</code> в отдельной области, <code>or panic</code> внутри <code>par</code> разрешён и превращается в <code>ParErrors.Add</code> + <code>cancel</code> + <code>return</code>, package-level инициализаторы с <code>or</code> запрещены.</p>
+
+      <h3>Write-check для <code>par</code></h3>
+      <p>Проверка статическая. Для обычного <code>par</code> sema считает captured read/write sets на каждый top-level оператор: у корня может быть один писатель, и никакой другой оператор не может его читать. Для <code>par for</code> запись в захваченный корень запрещена, кроме индексации с переменной итерации: <code>out[i] = ...</code> считается непересекающимся, если цепочка индексов — срез или массив. Локальные переменные, объявленные внутри тела, конфликтов не создают.</p>
+      <ul>
+        <li>Запись через захваченный указатель (<code>*p</code>, <code>p.f</code>, <code>p[i]</code>, <code>p.M()</code>), в слот map и в <code>self</code> запрещена. Прямые алиасы (<code>var q = p</code>) приписываются корню.</li>
+        <li><code>return</code>, <code>break</code>, <code>continue</code> не могут пересекать границу <code>par</code>; для выхода — <code>or return</code>/<code>or panic</code>.</li>
+        <li><code>defer</code>, <code>within</code> и <code>or panic</code> внутри <code>par</code> разрешены: у каждого воркера свой <code>DeferStack</code> и recovery boundary.</li>
+        <li>Не отслеживаются алиасы из полей/индексов и результаты вызовов, записи внутри function literals; вызов метода на захваченном интерфейсе считается записью, а указатель/интерфейс, переданный в свободную или Go-функцию, не отслеживается. Race detector автоматически не включается — <code>go build -race</code> остаётся оракулом (G11).</li>
+      </ul>
+
+      <h3>Context coloring</h3>
+      <p><code>NeedsCtx</code> — это fixpoint по графу вызовов. Семена: <code>par</code>, <code>par for</code>, <code>within</code> и Go-функции, у которых первый параметр — <code>context.Context</code>. Для каждого вызова sema записывает ребро «вызывающий → вызываемый»; если вызываемому нужен context, вызывающий тоже начинает нуждаться в нём, и так до неподвижной точки. Затем <code>NeedsCtx</code> проставляется на <code>FuncDecl</code> и <code>FuncLit</code>; <code>FuncType</code> и <code>CallInfo</code> получают его из сигнатур и вызовов.</p>
+      <pre><code>seed: par / within / Go(context.Context, ...)
+edge: caller -&gt; callee
+rule: callee.NeedsCtx =&gt; caller.NeedsCtx</code></pre>
+      <p>В прикладном коде context не виден: в языке нет отдельного <code>context</code>-типа и параметра <code>ctx</code>, который пишет пользователь. Это внутреннее свойство функции. Codegen сам добавляет первый параметр <code>_s_ctx context.Context</code> и сам подставляет его в вызовы. <code>within</code> подменяет <code>_s_ctx</code> на context с дедлайном внутри блока. На границе Go-интерфейса это перестаёт быть невидимым — см. G10.</p>
+      <div class="note teal">
+        <span class="note-title">Почему это работает не везде</span>
+        <p>Fixpoint идёт по прямым <code>CallExpr</code>, а не по всем потокам значений. Function values, Go-callback'и, методы интерфейсов, неизвестные типы получателя, package-level инициализаторы и часть тестовых путей могут не получить context (G10). Callback, которому нужен context, но который передаётся в Go, sema отклоняет явно: <code>a callback passed to Go cannot need a context</code>.</p>
+      </div>
+
+      <h3 id="typecheck"><code>internal/typecheck</code></h3>
+      <p>После чистого parse/sema <code>strizh check</code> и LSP вызывают <code>typecheck.Check</code>: он генерирует Go в памяти тем же <code>internal/gen</code>, подкладывает каждый <code>zz_strizh.go</code> и встроенный runtime через <code>packages.Config.Overlay</code> и загружает пакеты из реального module root. Режим — <code>LoadImports | NeedExportFile</code>, а не <code>LoadTypes</code>: так <code>go list</code> отдаёт export data и не типизирует все зависимости из исходников. Диагностика Go возвращается через <code>//line</code> как <code>Error{Path, Pos, Msg}</code>.</p>
+      <p>Результат кешируется в памяти по SHA-256 сгенерированных файлов, <code>go.mod</code>, <code>go.sum</code> и runtime; последние 16 результатов. <code>didOpen</code>/<code>didSave</code> запускают проверку, <code>didChange</code> — нет, поэтому ошибки типов очищаются до следующего сохранения. <code>build/run/test</code> не платят за второй typecheck и по-прежнему используют <code>go build</code>/<code>go test</code>. Контракт и пределы — <a href="../../design/TYPECHECK.md"><code>design/TYPECHECK.md</code></a>.</p>
+    </section>
+
+    <section id="gen">
+      <h2><span class="num">04</span>Codegen</h2>
+      <p>Генератор пишет один Go-файл на пакет и форматирует его через <code>go/format</code>. Имена импортов служебные: <code>_s_context</code>, <code>_s_fmt</code>, <code>_s_rt</code>; пользовательские алиасы сохраняются. Временные имена начинаются с <code>_s_</code>, поэтому этот префикс зарезервирован для codegen.</p>
+
+      <h3>Отображение типов</h3>
+      <table>
+        <thead><tr><th>Strizh</th><th>Go</th></tr></thead>
+        <tbody>
+          <tr><td><code>str</code>, <code>bool</code>, <code>i8…i64</code>, <code>u8…u64</code></td><td><code>string</code>, <code>bool</code>, <code>int8…int64</code>, <code>uint8…uint64</code></td></tr>
+          <tr><td><code>int</code>, <code>uint</code>, <code>usize</code>, <code>isize</code></td><td><code>int</code>, <code>uint</code>, <code>uint</code>, <code>int</code></td></tr>
+          <tr><td><code>f32</code>, <code>f64</code>, <code>rune</code>, <code>byte</code></td><td><code>float32</code>, <code>float64</code>, <code>rune</code>, <code>byte</code></td></tr>
+          <tr><td><code>T[]</code>, <code>T[N]</code>, <code>map[K,V]</code>, <code>*T</code></td><td><code>[]T</code>, <code>[N]T</code>, <code>map[K]V</code>, <code>*T</code></td></tr>
+          <tr><td><code>fn(A) R</code>, <code>void</code></td><td><code>func(A) R</code>, без результата</td></tr>
+          <tr><td><code>T or error</code></td><td><code>(T, error)</code></td></tr>
+          <tr><td><code>Duration</code>, <code>Type</code></td><td><code>time.Duration</code>, <code>reflect.Type</code></td></tr>
+        </tbody>
+      </table>
+
+      <h3>Структуры и методы</h3>
+      <p>Поля и методы живут в одном объявлении. Метод получает указательный receiver <code>self</code>; голое имя поля внутри метода превращается в <code>self.Field</code>, если его не перекрыли параметром или локальной переменной.</p>
+      <pre><code>type Counter = struct {
+    n: i32,
+    fn Inc() void = { n += 1; };
+};
+
+type Counter struct { n int32 }
+
+func (self *Counter) Inc() { self.n += 1 }</code></pre>
+
+      <h3>Enum: интерфейс и варианты</h3>
+      <p>Enum — это sealed interface. Маркерный метод неэкспортируем и реализуется указателем на структуру варианта; снаружи пакета реализовать enum нельзя. Конструирование заворачивает указатель в интерфейс, а <code>match</code> становится type switch'ем.</p>
+      <pre><code>type Shape = enum {
+    Circle { radius: f64 },
+    Empty,
+};
+
+type Shape interface{ _s_isShape() }
+type ShapeCircle struct { radius float64 }
+func (*ShapeCircle) _s_isShape() {}
+type ShapeEmpty struct{}
+func (*ShapeEmpty) _s_isShape() {}</code></pre>
+      <pre><code>Shape.Circle { radius = 2.0 }
+Shape(&amp;ShapeCircle{radius: 2.0})
+
+switch m := (s).(type) {
+case *ShapeCircle:
+    radius := m.radius
+    _ = radius
+case *ShapeEmpty:
+}</code></pre>
+      <p>В реальном коде в кейсах есть тело, а bindings полей становятся локальными переменными. Если variant-полей нет, структура пустая; <code>Empty</code> всё равно конструируется как <code>&amp;ShapeEmpty{}</code>.</p>
+
+      <h3>Ошибки: <code>(T, error)</code> и <code>or</code></h3>
+      <p>Fallible-функция возвращает Go multi-return: значение плюс <code>error</code>. <code>or</code> не становится исключением — он разворачивается в предикат <code>if err != nil</code> и ранний выход. Для <code>T or error</code> нулевое значение — <code>*new(T)</code>; для <code>void or error</code> возвращается только ошибка.</p>
+      <pre><code>var f = os.Open(path) or return;
+
+_s_v, _s_err := os.Open(path)
+if _s_err != nil {
+    return nil, _s_err
+}
+f := _s_v</code></pre>
+      <p><code>or err { ... }</code> заводит <code>err := _s_err</code> внутри ветки, <code>or panic("...")</code> превращается в <code>if _s_err != nil { panic("...") }</code>. Если у вызова только ошибка и результат не нужен, получается <code>if _s_err := f(); _s_err != nil { ... }</code>. Имена временных в примере упрощены: настоящий генератор добавляет суффиксы, чтобы не столкнуться с пользовательскими.</p>
+
+      <h3>Block-scoped <code>defer</code></h3>
+      <p>Функция, в которой есть <code>defer</code> или <code>within</code>, получает собственный <code>DeferStack</code>. На входе в блок запоминается марка, на выходе вызывается <code>RunTo(mark)</code>, а <code>return</code> и <code>break</code>/<code>continue</code> сначала прокручивают стек до нужной марки. Поэтому дефер срабатывает при выходе из блока, а не при выходе из функции.</p>
+      <pre><code>var _s_d _s_rt.DeferStack
+defer _s_d.RunTo(0)
+
+_s_mark := _s_d.Mark()
+_s_d.Push(func() { close(f) })
+_s_d.RunTo(_s_mark)
+
+_s_d.RunTo(0)
+return</code></pre>
+      <p>Получатель и аргументы <code>defer</code> вычисляются в момент объявления: генератор сохраняет их во временные переменные и только потом кладёт closure в стек. <code>within</code> использует тот же стек, чтобы гарантированно вызвать <code>cancel</code>.</p>
+
+      <h3><code>par</code>, <code>par for</code>, <code>within</code></h3>
+      <p>Обычный <code>par</code> — это <code>WaitGroup</code> и по горутине на top-level оператор. Контекст с <code>context.WithCancel</code> создаётся всегда, даже если тело статически не падает: паника в callee должна отменить соседей. Ошибки хранятся в <code>ParErrors</code> по индексу оператора; побеждает минимальный индекс. У каждого воркера свой <code>DeferStack</code> и recovery boundary: паника превращается в <code>PanicError</code> и отменяет блок. <code>par for</code> дополнительно ограничивает число активных горутин через буферизованный канал (по умолчанию <code>GOMAXPROCS(0)</code>) и захватывает переменные итерации по одной на итерацию.</p>
+      <pre><code>var _s_wg sync.WaitGroup
+_s_ctx, _s_cancel := _s_context.WithCancel(_s_ctx)
+var _s_pe _s_rt.ParErrors
+
+_s_wg.Add(2)
+go func() {
+    defer _s_wg.Done()
+    defer func() {
+        if r := recover(); r != nil {
+            _s_pe.Add(0, _s_rt.NewPanicError(r))
+            _s_cancel()
+        }
+    }()
+    var _s_d _s_rt.DeferStack
+    defer _s_d.RunTo(0)
+    f()
+}()
+go func() { defer _s_wg.Done(); g() }()
+_s_wg.Wait()
+
+if _s_err := _s_pe.First(); _s_err != nil {
+    _s_cancel()
+    return nil, _s_err
+}
+_s_cancel()</code></pre>
+      <p>В реальном выводе каждый оператор завёрнут в блок, а <code>or return</code> внутри горутины делает <code>_s_pe.Add(index, err)</code>, <code>cancel()</code> и <code>return</code> из горутины; <code>or panic</code> добавляет ошибку через <code>AsError</code> и тоже возвращает, а не паникует. В <code>void</code>-функции победившая ошибка перепаникуется на выходе из <code>par</code>. <code>within D</code> создаёт <code>context.WithTimeout</code> от контекста воркера, кладёт <code>cancel</code> в его <code>DeferStack</code> и подменяет <code>_s_ctx</code> на время блока.</p>
+      <pre><code>_s_ctx2, _s_cancel := _s_context.WithTimeout(_s_ctx, 30*_s_time.Second)
+_s_mark := _s_d.Mark()
+_s_d.Push(_s_cancel)
+{
+    f(_s_ctx2)
+}
+_s_d.RunTo(_s_mark)</code></pre>
+
+      <h3><code>//line</code> и мусор генератора</h3>
+      <p>Директивы <code>//line path:line</code> ставятся перед объявлениями и операторами. Путь сейчас абсолютный, колонки нет — это G34. <code>go/format</code> переформатирует уже собранный файл, поэтому директива должна пережить форматирование; она переживает, потому что стоит отдельной строкой.</p>
+      <ul>
+        <li>G32: в конце функции с результатом может остаться недостижимый <code>panic("unreachable")</code>.</li>
+        <li>G33: пользовательский <code>fmt</code> и служебный <code>_s_fmt</code> могут импортировать один путь дважды.</li>
+        <li>G35: <code>GoType.Text</code> иногда ссылается на пакет, которого нет в импортах.</li>
+        <li>G37: файлы перезаписываются целиком, манифеста сгенерированных файлов нет.</li>
+        <li>G38: runtime копируется на каждую сборку, даже если не изменился.</li>
+      </ul>
+    </section>
+
+    <section id="ffi">
+      <h2><span class="num">05</span>G10: context на границе Go-интерфейса</h2>
+      <p>Hidden context хорош, пока функция вызывается из Strizh. На границе Go-интерфейса он ломает сигнатуру: Go требует точного совпадения метода, а лишний первый параметр <code>context.Context</code> делает метод несовместимым. Это и есть G10.</p>
+
+      <h3>Проблема</h3>
+      <p>Допустим, тип <code>Model</code> реализует <code>tea.Model</code> и его <code>Update</code> доходит до <code>par</code> или до Go-функции с context. В Strizh это выглядит так:</p>
+      <pre><code>type Model = struct {
+    fn Update(msg: tea.Msg) tea.Model, tea.Cmd = { ... };
+};</code></pre>
+      <p>Sema ставит <code>NeedsCtx</code>, и наивный codegen выдаёт метод с context-параметром:</p>
+      <pre><code>func (self *Model) Update(_s_ctx _s_context.Context, msg tea.Msg) (tea.Model, tea.Cmd)</code></pre>
+      <p>А интерфейс Bubble Tea ожидает ровно это:</p>
+      <pre><code>type Model interface {
+    Init() Cmd
+    Update(Msg) (Model, Cmd)
+    View() View
+}</code></pre>
+      <p>Без обёртки Go увидел бы лишний ctx-параметр: сигнатуры не совпадают, <code>*Model</code> не реализует <code>tea.Model</code>, и <code>go build</code> падает. Sema (G27) сверяет method set исходного типа и ловит несовпадение сигнатуры до сборки; G10-обёртка сохраняет точную Go-сигнатуру.</p>
+
+      <h3>Решение 0.2</h3>
+      <div class="note warn">
+        <span class="note-title">Статус: 0.2, реализовано</span>
+        <p>Кодоген генерирует публичный метод с точной Go-сигнатурой и внутреннюю ctx-функцию. Внутри Strizh вызов идёт в ctx-версию, из Go — в публичную обёртку с <code>context.Background()</code>. Через границу пакета или function value дедлайн не переносится.</p>
+      </div>
+      <p>Публичная обёртка сохраняет точную Go-сигнатуру интерфейса и вызывает внутреннюю свободную функцию, у которой есть context. Внутренняя функция получает receiver явно, поэтому её можно вызвать и из сгенерированного Strizh-кода с текущим <code>_s_ctx</code>.</p>
+      <pre><code>func (self *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+    return _s_ModelUpdate(_s_context.Background(), self, msg)
+}
+
+func _s_ModelUpdate(_s_ctx _s_context.Context, self *Model, msg tea.Msg) (tea.Model, tea.Cmd) {
+    ...
+}</code></pre>
+      <p>Имена <code>_s_ModelUpdate</code> и <code>_s_ctx</code> здесь иллюстративные; важен shape: экспортируемый метод — ровно сигнатура интерфейса, внутренняя функция — с context. Вызов из Strizh, где context уже есть, должен идти напрямую:</p>
+      <pre><code>_s_ModelUpdate(_s_ctx, self, msg)</code></pre>
+      <p>Обёртка с <code>context.Background()</code> нужна для Go-вызова, у которого своего Strizh-context нет. Если Go-вызывающий хочет передать свой context, нужен отдельный adapter/API; интерфейсная сигнатура этого не позволяет.</p>
+
+      <h3>Почему внутренняя функция свободная, а не метод</h3>
+      <ul>
+        <li>В Go нет перегрузки: метод <code>Update</code> уже занят публичной сигнатурой. Метод с context обязан называться иначе.</li>
+        <li>Второй метод с context всё равно попадёт в method set типа: он расширяет служебную поверхность, добавляет ещё одно имя, которое надо держать уникальным, и не нужен никому, кроме обёртки.</li>
+        <li>Свободная функция с receiver-параметром — это тело метода без записи в method set: у типа не появляется лишнего метода. Экспортируемая поверхность остаётся ровно той, которую задал пользователь.</li>
+        <li>Внутреннюю функцию проще вызывать из сгенерированного кода: <code>_s_ModelUpdate(_s_ctx, self, msg)</code> не требует ни interface-assertion, ни обёртки.</li>
+      </ul>
+      <p>Та же схема применима к экспортируемым свободным функциям: публичная <code>Foo</code> с точной Go-сигнатурой и внутренняя <code>_s_Foo</code> с context. Для методов это единственный способ одновременно сохранить интерфейс и не потерять отмену.</p>
+    </section>
+
+    <section id="syntax02">
+      <h2><span class="num">06</span>Синтаксис 0.2 и кодоген</h2>
+      <div class="note">
+        <span class="note-title">Не всё уже реализовано</span>
+        <p>Ниже — раскладка 0.2. Списки результатов, <code>case T as k</code>, <code>else</code> и bare <code>nil</code> реализованы в parser/sema/gen; <code>bin/check</code> их покрывает.</p>
+      </div>
+      <table>
+        <thead><tr><th>0.2</th><th>Go</th><th>Статус в дереве</th></tr></thead>
+        <tbody>
+          <tr><td>Списки результатов <code>fn f() A, B</code></td><td><code>func f() (A, B)</code></td><td><span class="tag">готово</span> parser/AST/sema/gen; <code>or</code> — максимум один не-error результат; G13</td></tr>
+          <tr><td><code>case T as k</code></td><td><code>case T:</code> в type switch, binding в заголовке</td><td><span class="tag">готово</span> parser/sema/gen</td></tr>
+          <tr><td><code>else</code></td><td><code>default:</code></td><td><span class="tag">готово</span> <code>case _</code> больше не принимается</td></tr>
+          <tr><td>Bare <code>nil</code></td><td><code>nil</code> с типом из контекста</td><td><span class="tag">готово</span> expected type + nilability; G20</td></tr>
+          <tr><td><code>match</code> по <code>any</code></td><td><code>switch v := x.(type)</code></td><td><span class="tag">готово</span> type switch + <code>else</code>; G14</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Result lists → Go multi-return</h3>
+      <p>Результаты функции — это срез типов, а не один тип плюс ошибка. Генератор печатает их как Go multi-return; <code>return a, b</code> остаётся <code>return a, b</code>. Это уже видно в <code>ast.FuncDecl.Results</code> и <code>resultStr</code>. Список результатов — форма вызова, а не tuple: его нельзя положить в переменную, проиндексировать или передать как один аргумент.</p>
+      <pre><code>fn split(s: str) str, str = {
+    return s, s;
+};
+
+func split(s string) (string, string) {
+    return s, s
+}</code></pre>
+      <p>Ограничение: <code>or</code> поддерживает не более одного не-error результата. Multi-return нельзя использовать как одно выражение — допустимы <code>return</code>, <code>var a, b = f()</code> и <code>a, b = f()</code>. Это G13.</p>
+
+      <h3><code>case T as k</code> → type switch</h3>
+      <p>Для <code>match</code> по <code>any</code> тип-паттерн должен сузить значение и связать его с именем. В Go это обычный type switch; <code>k</code> — переменная с типом <code>T</code> внутри ветки.</p>
+      <pre><code>match (msg) {
+case tea.KeyPressMsg as k =&gt; handle(k);
+else =&gt; ignore();
+};
+
+switch k := msg.(type) {
+case tea.KeyPressMsg:
+    handle(k)
+default:
+    ignore()
+}</code></pre>
+      <p><code>else</code> — это <code>default</code>. Для <code>any</code> exhaustiveness невозможна, поэтому <code>else</code> обязателен; enum всё равно должен быть исчерпан, <code>else</code> его не заменяет. Type-паттерны имеют смысл только для <code>any</code> и интерфейсов; enum по-прежнему разбирается variant-паттернами.</p>
+
+      <h3>Bare <code>nil</code> → typed nil</h3>
+      <p>Bare <code>nil</code> разрешён, когда ожидаемый тип известен: <code>return nil;</code>, <code>f(nil)</code>, <code>x = nil</code>. Без контекста нужен явный <code>nil[*Node]</code>, <code>nil[error]</code>, <code>nil[u8[]]</code>. Генератор печатает <code>(T)(nil)</code>, а не <code>*new(T)</code>, поэтому значение действительно nil. Допустимы только nilable-типы: указатель, срез, map, функция, интерфейс (G20).</p>
+      <pre><code>fn stop() tea.Cmd = {
+    return nil;
+};
+
+var cmd = nil[tea.Cmd];</code></pre>
+
+      <h3>Почему это нужно Bubble Tea</h3>
+      <p><code>Update</code> возвращает <code>(tea.Model, tea.Cmd)</code> — два не-error результата; сообщения приходят как <code>any</code> и требуют type switch; <code>Cmd</code> — это функция, для неё нужен typed <code>nil</code>. Без этих трёх вещей <code>tea.Model</code> в Strizh не реализовать. Фоновые таймеры и IO для Bubble Tea не нужны: <code>Cmd</code> запускает сам <code>tea.Program</code>.</p>
+    </section>
+
+    <section id="lsp">
+      <h2><span class="num">07</span>LSP</h2>
+      <p><code>strizh lsp</code> — тот же бинарник, который говорит JSON-RPC по stdio. Сервер парсит проект, вызывает <code>sema.Check</code> и на open/save запускает <code>typecheck.Check</code>; диагностика публикуется с source <code>strizh</code>. Поэтому LSP видит то же, что <code>strizh check</code>: ошибки парсера, sema и типов Go.</p>
+
+      <h3>Что уже работает</h3>
+      <table>
+        <thead><tr><th>Возможность</th><th>Состояние</th></tr></thead>
+        <tbody>
+          <tr><td>Diagnostics</td><td>ошибки lexer/parser/sema и typecheck Go на open/save; <code>didChange</code> очищает типовые до следующего сохранения</td></tr>
+          <tr><td>Hover</td><td>простые идентификаторы, функции, типы; сигнатуры</td></tr>
+          <tr><td>Definition</td><td>локальные, пакетные и кросс-файловые символы</td></tr>
+          <tr><td>Completion</td><td>ключевые слова, builtin'ы, локальные имена, члены пакета после <code>pkg.</code></td></tr>
+          <tr><td>Document symbols</td><td>типы, варианты enum, методы, функции, тесты</td></tr>
+          <tr><td>Signature help</td><td>по <code>(</code> и <code>,</code>; Strizh-функции и Go-функции</td></tr>
+          <tr><td>Formatting</td><td>полный документ через <code>format.File</code></td></tr>
+        </tbody>
+      </table>
+
+      <h3>Ограничения G39–G45</h3>
+      <ul>
+        <li><strong>G39.</strong> Диагностика типов Go уже приходит на open/save (G26), но остались колонки (G34), async/debounce (G43), тестовые пакеты и ошибки вне <code>//line</code>.</li>
+        <li><strong>G40.</strong> Completion не знает типа выражения под курсором: после <code>u.</code> нет полей структуры, после <code>Shape.</code> нет вариантов enum, ключевые слова не контекстные.</li>
+        <li><strong>G41.</strong> Hover/definition не работают для селекторов и Go-символов; для части range-переменных definition возвращает <code>null</code>.</li>
+        <li><strong>G42.</strong> Нет rename, references, code actions, semantic tokens и folding. Только базовый набор выше.</li>
+        <li><strong>G43.</strong> Анализ синхронный: <code>didChange</code> блокирует цикл сообщений, пока sema обходит проект; debounce и отмены нет.</li>
+        <li><strong>G44.</strong> Очередь LSP-обвязки ограничена 64 сообщениями; при быстром наборе <code>didChange</code> может потеряться, и диагностика отстанет до следующей правки.</li>
+        <li><strong>G45.</strong> При закрытии файла диагностика не очищается: закрытые файлы продолжают анализироваться с диска, сбрасываются только удалённые и standalone-документы.</li>
+      </ul>
+
+      <h3>Почему это не блокер для Bubble Tea</h3>
+      <p>LSP — инструмент редактирования <code>.str</code>, а не часть рантайма. Ограничения G39–G45 ухудшают hover/completion/rename, но не мешают программе на Strizh вызвать Go-библиотеку. Языковые блокеры Bubble Tea были в G13 (multi-return) и G14 (type switch по <code>any</code>); 0.2 их закрывает. G10 добавляет обёртку, если <code>Update</code> уходит в <code>par</code>/<code>within</code>. Фоновые таймеры и IO запускает сам <code>tea.Program</code>. LSP можно улучшать отдельно.</p>
+      <div class="note teal">
+        <span class="note-title">Практический вывод</span>
+        <p>LSP уже даёт диагностику, включая typecheck Go; полноценный UI completion/hover по селекторам — G40/G41.</p>
+      </div>
+    </section>
+
+    <section id="runtime">
+      <h2><span class="num">08</span>Runtime</h2>
+      <p>Support-пакет называет себя <code>strizhrt</code>, но импортируется как <code>_s_rt</code>. Исходник лежит в <code>runtime/source.go</code>, встраивается в компилятор через <code>//go:embed</code> и при каждой сборке пишется в <code>.strizh/runtime/runtime.go</code> целевого проекта. Это обычный Go-код, не отдельный рантайм языка.</p>
+
+      <h3>Что внутри</h3>
+      <table>
+        <thead><tr><th>API</th><th>Зачем</th></tr></thead>
+        <tbody>
+          <tr><td><code>DeferStack.Mark() int</code></td><td>запомнить текущую длину стека перед входом в блок</td></tr>
+          <tr><td><code>DeferStack.Push(fn func())</code></td><td>положить отложенный вызов</td></tr>
+          <tr><td><code>DeferStack.RunTo(mark int)</code></td><td>выполнить всё выше марки в обратном порядке; марка обрезается до допустимого диапазона</td></tr>
+          <tr><td><code>Assert(ok bool, pos string)</code></td><td>panic с <code>file:line</code>, если условие ложно</td></tr>
+          <tr><td><code>AssertEq[T comparable](got, want T, pos string)</code></td><td>сравнение с внятным сообщением</td></tr>
+          <tr><td><code>Has[K comparable, V any](m map[K]V, k K) bool</code></td><td>проверка наличия ключа для <code>has(m, k)</code></td></tr>
+          <tr><td><code>PanicError{Value, Stack}</code></td><td>паника воркера: значение и stack для сообщения и <code>errors.As</code></td></tr>
+          <tr><td><code>NewPanicError(v any)</code></td><td>обернуть значение паники и снять <code>debug.Stack()</code> на recovery boundary</td></tr>
+          <tr><td><code>ParErrors.Add(index int, err error)</code></td><td>потокобезопасно сложить ошибку с номером</td></tr>
+          <tr><td><code>ParErrors.First() error</code></td><td>вернуть ошибку с минимальным неотрицательным индексом; <code>-1</code> — только если других нет</td></tr>
+        </tbody>
+      </table>
+
+      <h3>DeferStack</h3>
+      <p>Внутри — срез <code>[]func()</code>. <code>Mark</code> возвращает длину, <code>Push</code> добавляет в конец, <code>RunTo(mark)</code> забирает хвост <code>fns[mark:]</code>, обрезает срез и вызывает хвост с конца. Поэтому defer'ы выполняются LIFO и не мешают друг другу между блоками и итерациями цикла.</p>
+
+      <h3>ParErrors</h3>
+      <p>Это мьютекс и срез <code>ParError{Index, Err}</code>. <code>Add</code> игнорирует <code>nil</code>, <code>First</code> выбирает минимальный неотрицательный индекс, а не порядок завершения. Для <code>par</code> индекс — номер top-level оператора, для <code>par for</code> — порядковый номер итерации. Для map-итерации индекса нет: все воркеры отдают <code>-1</code>, и <code>First</code> берёт первую дошедшую ошибку только если неотрицательных записей нет. Порядок map-итерации недетерминирован.</p>
+
+      <h3>Почему runtime копируется</h3>
+      <p>Сгенерированный Go импортирует <code>&lt;module&gt;/.strizh/runtime</code>, а не пакет из исходников компилятора. Так проект остаётся самодостаточным: его можно собрать без исходников Strizh, и версия runtime всегда совпадает с версией компилятора, который сгенерировал код. Каталог <code>.strizh</code> скрытый, поэтому обход проекта его не парсит. Копирование происходит на каждую сборку, даже если файл не изменился (G38); хеширование и пропуск записи — возможная оптимизация, не обязательная для корректности.</p>
+    </section>
+
+    <section id="tests">
+      <h2><span class="num">09</span>Тесты</h2>
+      <p>Основной оракул — conformance-программы в <code>tests/cases</code>. Каждый кейс проходит через настоящий компилятор, <code>go build</code> и запуск; сравнение идёт по stdout, а не по мокам внутренних функций. Юнит-тесты лексера, парсера, sema, gen и LSP лежат рядом с пакетами и дополняют эту картину.</p>
+
+      <h3>Как устроен кейс</h3>
+      <pre><code>tests/cases/par/
+  strizh.toml
+  main.str
+  expected.txt</code></pre>
+      <ul>
+        <li><code>strizh.toml</code> — имя проекта; модуль можно не указывать, драйвер подставит <code>example.com/&lt;name&gt;</code>.</li>
+        <li><code>main.str</code> — программа с <code>fn main</code>; она печатает то, что сравнивается.</li>
+        <li><code>expected.txt</code> — ожидаемый stdout, обычно несколько строк.</li>
+        <li>Если есть файл-маркер <code>test</code>, кейс запускается через <code>strizh test</code>, а не <code>strizh run</code>; тогда можно добавить <code>expected-test.txt</code> для строк <code>ok/FAIL</code>.</li>
+      </ul>
+
+      <h3>Что делает <code>tests/run.sh</code></h3>
+      <p>Скрипт идёт по всем каталогам <code>tests/cases/*</code>, запускает <code>strizh run</code> (или <code>strizh test</code>), сравнивает вывод через <code>diff</code>, затем удаляет <code>.strizh</code>, <code>bin</code>, <code>zz_strizh*.go</code>, <code>go.mod</code> и <code>go.sum</code>. На кейс даётся 120 секунд, на тестовый — 180. Поэтому кейсы можно смело добавлять в репозиторий: они не оставляют мусора.</p>
+
+      <h3>Как добавить новый кейс</h3>
+      <ol>
+        <li>Создайте <code>tests/cases/&lt;name&gt;/</code> и положите туда <code>strizh.toml</code> с <code>name = "&lt;name&gt;"</code>.</li>
+        <li>Напишите <code>main.str</code>; если нужен тест — добавьте блок <code>test "..." { ... };</code> и пустой файл <code>test</code>.</li>
+        <li>Запустите программу вручную и сохраните точный stdout в <code>expected.txt</code> (или <code>expected-test.txt</code>).</li>
+        <li>После сборки компилятора запустите <code>tests/run.sh</code> или весь <code>bin/check</code>.</li>
+      </ol>
+      <pre><code>test "append grows the slice" {
+    var xs = u8[] {};
+    xs = append(xs, 1);
+    assert_eq(len(xs), 1);
+};</code></pre>
+
+      <h3><code>bin/check</code></h3>
+      <p>Единая точка входа: <code>gofmt -l cmd internal runtime</code>, <code>go vet ./...</code>, <code>go test ./...</code>, сборка <code>bin/strizh</code> и <code>tests/run.sh</code>. Во время рефакторинга компилятора этот набор может быть красным; страница описывает код, а не статус CI.</p>
+      <div class="note">
+        <span class="note-title">Во время рефакторинга</span>
+        <p>Не запускайте <code>bin/check</code> как «доказательство» чего-либо, пока идёт переделка. Для отдельного кейса достаточно <code>tests/run.sh</code> после сборки, но и он требует рабочего <code>bin/strizh</code>.</p>
+      </div>
+    </section>
+
+    <section id="limits">
+      <h2><span class="num">10</span>Границы: 0.2 и дальше</h2>
+      <p>Strizh — это 0.2 preview. Граница между «уже работает» и «запланировано» важнее любой красивой схемы: если поведение не подтверждено кодом, страница помечает его как план. Полный список — в <a href="../../design/GAPS.md">design/GAPS.md</a>.</p>
+
+      <div class="grid-2">
+        <div class="card">
+          <h3>0.2 — вертикальный срез</h3>
+          <ul>
+            <li>Публичная обёртка для hidden context на Go-границе (G10).</li>
+            <li>Списки результатов и Go multi-return (G13).</li>
+            <li><code>case T as k</code>, <code>else</code>, bare <code>nil</code>, <code>match</code> по <code>any</code> (G14, G20).</li>
+            <li><code>par</code> core: panic recovery, per-worker defer/within, write rules (G1–G9).</li>
+            <li>Typecheck в <code>strizh check</code> и LSP (G26), method sets (G27).</li>
+            <li>Conformance-кейсы и smoke для Bubble Tea.</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>Отложено</h3>
+          <ul>
+            <li>Локальные именованные функции (G12), constraints (G15), generic enum'ы (G16).</li>
+            <li>Богатые паттерны и guard'ы (G17), expression-level <code>or</code> (G22), variadics (G24), doc comments (G25).</li>
+            <li>Остатки typecheck: async/debounce (G43), колонки (G34), тестовые пакеты.</li>
+            <li>Rename/references/code actions (G42), debounce и очередь LSP (G43–G45).</li>
+            <li>Динамический race oracle (G11).</li>
+          </ul>
+        </div>
+      </div>
+
+      <h3>Что не блокирует Bubble Tea</h3>
+      <p>LSP и formatter — инструменты, они не участвуют в рантайме. Блокеры Bubble Tea лежат в языке: multi-return (G13) и type switch по <code>any</code> (G14). Фоновые таймеры и IO запускает сам <code>tea.Program</code>. «Нет rename» и «нет hover по селектору» — неприятно, но не причина отказываться от Go-библиотек.</p>
+
+      <h3>Что читать дальше</h3>
+      <ul>
+        <li><a href="../../design/IMPL.md">design/IMPL.md</a> — контракты пакетов и правила кодогена.</li>
+        <li><a href="../../design/SPEC.md">design/SPEC.md</a> — язык как он задуман в 0.2 preview.</li>
+        <li><a href="../../design/GAPS.md">design/GAPS.md</a> — честный список пробелов и порядок работ.</li>
+        <li><a href="../../docs/decisions.md">docs/decisions.md</a> — почему компилятор устроен именно так.</li>
+      </ul>
+    </section>
+  </main>
+</div>
+
+<footer class="site-footer">
+  <div class="wrap">
+    <p>Страница собрана по <code>design/IMPL.md</code>, <code>design/SPEC.md</code>, <code>design/GAPS.md</code>, <code>design/TYPECHECK.md</code> и исходникам <code>internal/lexer</code>, <code>internal/parser</code>, <code>internal/ast</code>, <code>internal/sema</code>, <code>internal/gen</code>, <code>internal/typecheck</code>, <code>internal/driver</code>, <code>internal/lsp</code> и <code>runtime/</code>. Октябрь 2026.</p>
+    <p>Если код и страница разойдутся, верьте коду. На момент сборки <code>bin/check</code> зелёный.</p>
+    <p><a href="index.html">← К презентации</a> · <a href="cheatsheet.html">Шпаргалка</a> · <a href="#top">Наверх</a></p>
+  </div>
+</footer>
+
+<script>
+(function () {
+  var button = document.getElementById("print-btn");
+  if (button) {
+    button.hidden = false;
+    button.addEventListener("click", function () {
+      window.print();
+    });
+  }
+  if (!("IntersectionObserver" in window)) {
+    return;
+  }
+  var links = Array.prototype.slice.call(document.querySelectorAll('.toc a[href^="#"]'));
+  var byId = {};
+  links.forEach(function (link) {
+    var id = link.getAttribute("href").slice(1);
+    var section = document.getElementById(id);
+    if (section) {
+      byId[id] = link;
+    }
+  });
+  var observer = new IntersectionObserver(function (entries) {
+    entries.forEach(function (entry) {
+      if (!entry.isIntersecting) {
+        return;
+      }
+      links.forEach(function (link) {
+        link.classList.remove("active");
+      });
+      var active = byId[entry.target.id];
+      if (active) {
+        active.classList.add("active");
+      }
+    });
+  }, { rootMargin: "-18% 0px -72% 0px", threshold: 0 });
+  Object.keys(byId).forEach(function (id) {
+    observer.observe(document.getElementById(id));
+  });
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+set -euo pipefail
+cd "$(dirname "$0")/.."
+export GOFLAGS="${GOFLAGS:-} -buildvcs=false"
+unformatted="$(gofmt -l cmd internal runtime 2>/dev/null || true)"
+if [ -n "$unformatted" ]; then
+  echo "gofmt needed:" >&2
+  echo "$unformatted" >&2
+  exit 1
+fi
+go vet ./...
+go test ./...
+go build -o bin/strizh ./cmd/strizh
+if [ -x tests/run.sh ]; then
+  tests/run.sh
+fi

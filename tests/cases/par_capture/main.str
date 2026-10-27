@@ -1,0 +1,11 @@
+use fmt;
+
+fn main() void or error = {
+    var out = int[6] {};
+    var i = 0;
+    par for (i = 0; i < 6; i += 1) limit 2 {
+        out[i] = i * 10;
+    };
+    fmt.Println(i) or return;
+    fmt.Println(out) or return;
+};

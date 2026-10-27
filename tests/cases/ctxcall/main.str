@@ -1,0 +1,12 @@
+use fmt;
+use "os/exec";
+
+fn main() void or error = {
+    var cmd = exec.CommandContext("true");
+    var err = cmd.Run();
+    if (err == nil[error]) {
+        fmt.Println("ok") or return;
+    } else {
+        fmt.Println("failed") or return;
+    };
+};

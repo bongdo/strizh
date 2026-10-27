@@ -1,0 +1,6 @@
+use fmt;
+use "./lib" as lib;
+
+fn main() void or error = {
+    fmt.Println(lib.Square(7)) or return;
+};

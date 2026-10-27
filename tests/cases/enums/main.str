@@ -1,0 +1,45 @@
+use fmt;
+
+type Shape = enum {
+    Circle { radius: f64 },
+    Rect { w: f64, h: f64 },
+    Empty,
+};
+
+fn area(s: Shape) f64 = {
+    return match (s) {
+    case Circle { radius } => 3.0 * radius * radius;
+    case Rect { w, h } => w * h;
+    case Empty => 0.0;
+    };
+};
+
+fn main() void or error = {
+    var shapes = Shape[] {
+        Shape.Circle { radius = 2.0 },
+        Shape.Rect { w = 2.0, h = 3.0 },
+        Shape.Empty,
+    };
+    for (var s in shapes) {
+        fmt.Println(area(s)) or return;
+    };
+    var last = 0.0;
+    match (shapes[0]) {
+    case Circle { radius } => {
+        last = radius;
+    };
+    case Rect { w, h } => {
+        last = w + h;
+    };
+    case Empty => {
+        last = 0.0;
+    };
+    };
+    fmt.Println(last) or return;
+    var desc = match (shapes[0]) {
+    case Circle { radius } => "circle";
+    case Rect { w, h } => "rect";
+    case Empty => "empty";
+    };
+    fmt.Println(desc) or return;
+};

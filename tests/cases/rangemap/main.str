@@ -1,0 +1,25 @@
+use fmt;
+use sort;
+use "net/http" as http;
+
+type M = map[str, i32];
+
+fn main() void = {
+    var m = M { "B" = 2, "A" = 1 };
+    var keys = str[] {};
+    for (var k in m) {
+        keys = append(keys, k);
+    };
+    sort.Strings(keys);
+    fmt.Println(keys);
+
+    var h = http.Header {};
+    h["C"] = str[] {"x"};
+    h["A"] = str[] {"y"};
+    var hk = str[] {};
+    for (var k in h) {
+        hk = append(hk, k);
+    };
+    sort.Strings(hk);
+    fmt.Println(hk);
+};

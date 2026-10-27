@@ -1,0 +1,11 @@
+bin/strizh
+pero-strizhed
+*.test
+.strizh/
+zz_strizh.go
+zz_strizh_test.go
+editors/vscode/node_modules/
+editors/vscode/out/
+tests/cases/*/go.mod
+tests/cases/*/go.sum
+tests/cases/*/bin/

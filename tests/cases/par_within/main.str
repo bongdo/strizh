@@ -1,0 +1,20 @@
+use fmt;
+
+fn work(n: i32) i32 = {
+    return n * 10;
+};
+
+fn main() void or error = {
+    var a = i32(0);
+    var b = i32(0);
+    par {
+        within 5s {
+            defer fmt.Println("inner");
+            a = work(1);
+        };
+        within 5s {
+            b = work(2);
+        };
+    };
+    fmt.Println(a, b) or return;
+};

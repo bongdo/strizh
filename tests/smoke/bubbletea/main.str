@@ -1,0 +1,35 @@
+use fmt;
+use "charm.land/bubbletea/v2" as tea;
+
+type Model = struct {
+    cursor: int,
+
+    fn Init() tea.Cmd = {
+        return nil;
+    };
+
+    fn Update(msg: tea.Msg) tea.Model, tea.Cmd = {
+        match (msg) {
+        case tea.KeyPressMsg as k => {
+            if (k.String() == "down") {
+                cursor += 1;
+            };
+        };
+        else => {};
+        };
+        par {
+            fmt.Println("update");
+        };
+        return self, nil;
+    };
+
+    fn View() tea.View = {
+        return tea.NewView("hello");
+    };
+};
+
+fn main() void or error = {
+    var m = Model {};
+    var p = tea.NewProgram(&m);
+    p.Run() or return;
+};

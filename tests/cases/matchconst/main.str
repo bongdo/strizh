@@ -1,0 +1,22 @@
+use fmt;
+use os;
+
+const Small = 10;
+
+fn classify(n: i32) str = {
+    return match (n) {
+    case 0 => "zero";
+    case Small => "small";
+    else => "big";
+    };
+};
+
+fn main() void or error = {
+    fmt.Println(classify(0)) or return;
+    fmt.Println(classify(10)) or return;
+    fmt.Println(classify(99)) or return;
+    fmt.Println(match (os.O_RDONLY) {
+    case os.O_WRONLY => "write";
+    else => "read";
+    }) or return;
+};

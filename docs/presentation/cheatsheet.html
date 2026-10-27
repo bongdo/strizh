@@ -1,0 +1,928 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Strizh 0.2: печатная шпаргалка по синтаксису, ошибкам, конкурентности и Go interop.">
+<meta name="theme-color" content="#0f1115">
+<title>Strizh 0.2 — шпаргалка</title>
+<style>
+  :root {
+    --bg: #0f1115;
+    --panel: #12161e;
+    --text: #e8e6e1;
+    --amber: #e0a458;
+    --teal: #6fb3a8;
+    --muted: #8b949e;
+    --code: #161b22;
+    --border: #262c36;
+    --line: #303845;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  }
+
+  * { box-sizing: border-box; }
+
+  html {
+    color-scheme: dark;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    color: var(--text);
+    background:
+      radial-gradient(1100px 560px at 12% -8%, rgba(224, 164, 88, .06), transparent 62%),
+      radial-gradient(900px 520px at 100% 0%, rgba(111, 179, 168, .05), transparent 58%),
+      var(--bg);
+    font: 15px/1.55 var(--sans);
+    -webkit-text-size-adjust: 100%;
+  }
+
+  ::selection { background: rgba(224, 164, 88, .28); }
+
+  a {
+    color: var(--teal);
+    text-decoration: none;
+    border-bottom: 1px solid rgba(111, 179, 168, .35);
+  }
+
+  a:hover {
+    color: var(--amber);
+    border-bottom-color: var(--amber);
+  }
+
+  a:focus-visible {
+    outline: 2px solid var(--amber);
+    outline-offset: 3px;
+  }
+
+  .sheet {
+    width: 100%;
+    max-width: 1440px;
+    margin: 0 auto;
+    padding: 34px clamp(18px, 4vw, 48px) 40px;
+  }
+
+  .masthead {
+    display: flex;
+    align-items: flex-start;
+    gap: 24px;
+    flex-wrap: wrap;
+    padding-bottom: 20px;
+    margin-bottom: 16px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    min-width: 0;
+  }
+
+  .brand svg {
+    width: 54px;
+    height: 54px;
+    flex: none;
+  }
+
+  .eyebrow {
+    margin-bottom: 6px;
+    color: var(--amber);
+    font: 600 11px/1.2 var(--mono);
+    letter-spacing: .14em;
+    text-transform: uppercase;
+  }
+
+  h1 {
+    margin: 0 0 6px;
+    font-size: clamp(28px, 3.4vw, 40px);
+    font-weight: 700;
+    line-height: 1.05;
+    letter-spacing: -.03em;
+    text-wrap: balance;
+  }
+
+  .sub {
+    max-width: 66ch;
+    margin: 0;
+    color: var(--muted);
+    font-size: 14px;
+  }
+
+  .nav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-left: auto;
+    padding-top: 6px;
+  }
+
+  .nav a {
+    padding: 8px 12px;
+    color: var(--teal);
+    background: rgba(22, 27, 34, .6);
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    font: 12px/1 var(--mono);
+    text-decoration: none;
+  }
+
+  .nav a:hover {
+    color: var(--amber);
+    border-color: var(--amber);
+  }
+
+  .toc {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 18px;
+    margin: 0 0 22px;
+    color: var(--muted);
+    font: 11.5px/1.5 var(--mono);
+  }
+
+  .toc a {
+    color: var(--muted);
+    border-bottom: 0;
+  }
+
+  .toc a:hover { color: var(--amber); }
+  .toc .n { margin-right: 5px; color: var(--amber); }
+
+  .cols {
+    column-count: 2;
+    column-gap: 26px;
+    column-fill: balance;
+  }
+
+  .card {
+    display: inline-block;
+    width: 100%;
+    margin: 0 0 20px;
+    padding: 18px 18px 16px;
+    vertical-align: top;
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, .015), transparent 120px),
+      var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    box-shadow: 0 1px 0 rgba(0, 0, 0, .25);
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  h2 {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    margin: 0 0 10px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border);
+    font-size: 16px;
+    line-height: 1.25;
+    letter-spacing: -.01em;
+  }
+
+  .num {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: none;
+    min-width: 25px;
+    height: 22px;
+    padding: 0 5px;
+    color: var(--amber);
+    background: rgba(224, 164, 88, .08);
+    border: 1px solid rgba(224, 164, 88, .35);
+    border-radius: 6px;
+    font: 600 10.5px/1 var(--mono);
+    letter-spacing: .06em;
+  }
+
+  h3 {
+    margin: 14px 0 6px;
+    color: var(--teal);
+    font: 600 11px/1.3 var(--mono);
+    letter-spacing: .09em;
+    text-transform: uppercase;
+  }
+
+  p { margin: 8px 0; }
+
+  ul, ol {
+    margin: 8px 0;
+    padding-left: 1.15em;
+  }
+
+  li { margin: 4px 0; }
+  li::marker { color: var(--teal); }
+
+  code {
+    padding: .1em .32em;
+    color: var(--text);
+    background: rgba(22, 27, 34, .9);
+    border: 1px solid rgba(48, 56, 69, .7);
+    border-radius: 4px;
+    font-family: var(--mono);
+    font-size: .9em;
+  }
+
+  pre {
+    margin: 10px 0;
+    padding: 12px 13px;
+    overflow-x: auto;
+    background: var(--code);
+    border: 1px solid #222a35;
+    border-radius: 8px;
+    overscroll-behavior-inline: contain;
+  }
+
+  pre code {
+    display: block;
+    padding: 0;
+    color: #e8e6e1;
+    background: none;
+    border: 0;
+    font-size: 12.3px;
+    line-height: 1.52;
+    white-space: pre;
+  }
+
+  table {
+    width: 100%;
+    margin: 10px 0;
+    border-collapse: collapse;
+    font-size: 12.5px;
+  }
+
+  th {
+    padding: 6px 8px;
+    color: var(--muted);
+    border-bottom: 1px solid var(--line);
+    font: 600 10px/1.3 var(--mono);
+    letter-spacing: .08em;
+    text-align: left;
+    text-transform: uppercase;
+  }
+
+  td {
+    padding: 5px 8px;
+    vertical-align: top;
+    border-bottom: 1px solid rgba(38, 44, 54, .75);
+  }
+
+  tr:last-child td { border-bottom: 0; }
+
+  td code {
+    padding: 0;
+    color: var(--amber);
+    background: none;
+    border: 0;
+  }
+
+  .label {
+    margin: 12px 0 0;
+    color: var(--muted);
+    font: 600 10px/1.2 var(--mono);
+    letter-spacing: .1em;
+    text-transform: uppercase;
+  }
+
+  .label + pre { margin-top: 6px; }
+
+  .muted {
+    color: var(--muted);
+    font-size: 12.5px;
+  }
+
+  .note {
+    margin: 10px 0;
+    padding: 9px 11px;
+    background: rgba(224, 164, 88, .055);
+    border-left: 2px solid var(--amber);
+    border-radius: 0 6px 6px 0;
+    font-size: 13px;
+  }
+
+  .note.teal {
+    background: rgba(111, 179, 168, .05);
+    border-left-color: var(--teal);
+  }
+
+  .note b { color: var(--amber); }
+  .note.teal b { color: var(--teal); }
+  .note p:first-child { margin-top: 0; }
+  .note p:last-child { margin-bottom: 0; }
+  .note pre { margin: 8px 0; }
+
+  .foot {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-top: 8px;
+    padding-top: 14px;
+    color: var(--muted);
+    border-top: 1px solid var(--border);
+    font-size: 12px;
+  }
+
+  .foot a { color: var(--muted); }
+  .foot a:hover { color: var(--amber); }
+
+  @media (max-width: 1160px) {
+    .cols { column-count: 1; }
+
+    .masthead { gap: 16px; }
+
+    .nav {
+      width: 100%;
+      margin-left: 0;
+      padding-top: 0;
+    }
+
+    .sheet { padding: 24px 16px 32px; }
+  }
+
+  @media (max-width: 520px) {
+    h1 { font-size: 27px; }
+
+    .brand { align-items: flex-start; }
+    .brand svg { width: 44px; height: 44px; }
+
+    .card { padding: 14px 14px 12px; }
+
+    pre code { font-size: 11px; }
+    table { font-size: 11.5px; }
+  }
+
+  @media print {
+    :root {
+      --bg: #fff;
+      --panel: #fff;
+      --text: #000;
+      --amber: #000;
+      --teal: #000;
+      --muted: #333;
+      --code: #f6f6f6;
+      --border: #bbb;
+      --line: #ccc;
+    }
+
+    @page {
+      size: A4;
+      margin: 10mm;
+    }
+
+    html {
+      color-scheme: light;
+      background: #fff !important;
+    }
+
+    body {
+      background: #fff !important;
+      color: #000;
+      font-size: 9pt;
+      line-height: 1.4;
+    }
+
+    .sheet {
+      max-width: none;
+      padding: 0;
+    }
+
+    .masthead {
+      padding-bottom: 4mm;
+      margin-bottom: 3mm;
+      border-color: #bbb;
+    }
+
+    .brand svg {
+      width: 12mm;
+      height: 12mm;
+      filter: grayscale(1) contrast(1.2);
+    }
+
+    .eyebrow { color: #000; font-size: 8pt; }
+    h1 { font-size: 19pt; }
+    .sub { color: #333; font-size: 8.5pt; }
+
+    .nav, .toc, .foot { display: none !important; }
+
+    .cols {
+      column-count: 2;
+      column-gap: 6mm;
+    }
+
+    .card {
+      display: block;
+      margin-bottom: 4mm;
+      padding: 3mm;
+      background: #fff !important;
+      border: 1px solid #bbb;
+      border-radius: 0;
+      box-shadow: none !important;
+      break-inside: avoid;
+      page-break-inside: avoid;
+    }
+
+    h2 {
+      margin-bottom: 2mm;
+      padding-bottom: 2mm;
+      border-color: #bbb;
+      font-size: 10.5pt;
+      break-after: avoid;
+    }
+
+    .num {
+      color: #000;
+      background: none;
+      border-color: #999;
+      font-size: 7.5pt;
+    }
+
+    h3 {
+      margin: 3mm 0 1mm;
+      color: #000;
+      font-size: 8pt;
+      break-after: avoid;
+    }
+
+    p, ul, ol { font-size: 8.5pt; }
+    li { margin: 1mm 0; }
+
+    pre {
+      margin: 2mm 0;
+      padding: 2mm;
+      overflow: visible;
+      background: #f6f6f6 !important;
+      border: 1px solid #ddd;
+      border-radius: 0;
+      white-space: pre-wrap;
+      break-inside: avoid;
+      page-break-inside: avoid;
+    }
+
+    pre code {
+      color: #000;
+      font-size: 7.2pt;
+      line-height: 1.35;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+
+    code {
+      color: #000 !important;
+      background: #f0f0f0 !important;
+      border: 0;
+      font-size: .92em;
+    }
+
+    td code { color: #000 !important; }
+
+    a {
+      color: #000 !important;
+      border-bottom: 0;
+      text-decoration: underline;
+    }
+
+    .note {
+      background: #f7f7f7 !important;
+      border-left: 1px solid #000;
+      color: #000;
+    }
+
+    .note b { color: #000; }
+    .muted { color: #333; }
+
+    table {
+      font-size: 8pt;
+      break-inside: avoid;
+    }
+
+    th { color: #000; border-color: #bbb; }
+    td { border-color: #ddd; }
+  }
+</style>
+</head>
+<body>
+<div class="sheet">
+
+  <header class="masthead">
+    <div class="brand">
+      <svg viewBox="0 0 64 64" width="54" height="54" aria-hidden="true" focusable="false">
+        <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M19 53 L45 13" stroke="#e0a458" stroke-width="3.2"/>
+          <path d="M45.4 12.6 L50 7 L47.2 15.8 Z" fill="#e0a458" stroke="none"/>
+          <path d="M41.5 19 C35.6 19.4 31.6 21.9 28.7 27" stroke="#6fb3a8" stroke-width="2.4"/>
+          <path d="M37 26 C32.1 26.4 28.6 28.9 26.1 33.5" stroke="#6fb3a8" stroke-width="2.4"/>
+          <path d="M32.5 33 C28.6 33.4 26 35.4 24 39" stroke="#6fb3a8" stroke-width="2.4"/>
+          <path d="M28 40 C25.1 40.4 23 42 21.5 44.5" stroke="#6fb3a8" stroke-width="2.4"/>
+          <path d="M12 54 C24 58 40 57 52 50" stroke="#6fb3a8" stroke-width="2.2" opacity=".75"/>
+        </g>
+      </svg>
+      <div>
+        <div class="eyebrow">Strizh · 0.2 preview</div>
+        <h1>Шпаргалка по языку</h1>
+        <p class="sub">Синтаксис, ошибки, конкурентность и границы 0.2 в одном файле. Код на Strizh, пояснения по-русски.</p>
+      </div>
+    </div>
+    <nav class="nav" aria-label="Соседние страницы">
+      <a href="index.html">← Презентация</a>
+      <a href="internals.html">Внутренности →</a>
+    </nav>
+  </header>
+
+  <nav class="toc" aria-label="Содержание">
+    <a href="#files"><span class="n">01</span>Файлы</a>
+    <a href="#values"><span class="n">02</span>Значения</a>
+    <a href="#types"><span class="n">03</span>Типы</a>
+    <a href="#structs"><span class="n">04</span>Struct</a>
+    <a href="#enums"><span class="n">05</span>Enum/match</a>
+    <a href="#errors"><span class="n">06</span>Ошибки</a>
+    <a href="#flow"><span class="n">07</span>Control flow</a>
+    <a href="#concurrency"><span class="n">08</span>Конкурентность</a>
+    <a href="#interop"><span class="n">09</span>Go interop</a>
+    <a href="#cli"><span class="n">10</span>CLI</a>
+    <a href="#limits"><span class="n">11</span>Границы</a>
+  </nav>
+
+  <main class="cols">
+
+    <section class="card" id="files">
+      <h2><span class="num">01</span> Файлы, пакеты, импорты</h2>
+      <ul>
+        <li>Файлы <code>.str</code>, UTF-8. Один каталог — один пакет; отдельной <code>package</code>-строки нет.</li>
+        <li>Корень проекта — каталог с <code>strizh.toml</code>. Корневой пакет компилируется как <code>package main</code> и обязан иметь <code>fn main</code>.</li>
+        <li>Видимость по первой букве: <code>User</code> — public, <code>user</code> — private. Имена <code>_s_*</code> зарезервированы кодогеном.</li>
+      </ul>
+      <p class="label">strizh.toml</p>
+      <pre><code>name = "hello"
+module = "example.com/hello"</code></pre>
+      <p class="label">Импорты</p>
+      <pre><code>use fmt;
+use os;
+use "./lib" as lib;
+use "charm.land/bubbletea/v2" as tea;</code></pre>
+      <ul>
+        <li><code>use fmt;</code> — Go stdlib; Go-имена сохраняются: <code>fmt.Println</code>.</li>
+        <li><code>"./lib"</code> — локальный пакет; путь без ведущей точки — Go-модуль; <code>as</code> — алиас.</li>
+        <li>Комментарии <code>//</code> и <code>/* ... */</code>; <code>;</code> обязательна в конце statement.</li>
+      </ul>
+    </section>
+
+    <section class="card" id="values">
+      <h2><span class="num">02</span> Переменные, константы, nil</h2>
+      <pre><code>var x = 1;
+var xs = u8[] {1, 2, 3};
+var a = u8[3] {1, 2, 3};
+var u = User { Name = "Alice", age = 30 };
+var m = map[str, int] { "a" = 1 };
+
+const Max = 100;
+const Greeting = "hello";</code></pre>
+      <ul>
+        <li><code>var</code> всегда с инициализатором, тип выводится. <code>:=</code>, <code>let</code> и аннотаций типа у <code>var</code> нет.</li>
+        <li>Составной литерал всегда несёт тип. Пропущенные поля — zero value. Присваивание: <code>xs = append(xs, 4);</code>, <code>m["a"] = 2;</code></li>
+        <li>Ключа нет — вернётся zero value; проверка наличия — <code>has(m, "a")</code>.</li>
+      </ul>
+      <pre><code>len  cap  append  copy  delete  has  min  max
+runes(s)  bytes(s)  str(runes_or_bytes)
+i32(x)  u64(x)  f64(x)</code></pre>
+      <div class="note">
+        <p><b>nil.</b> Голый <code>nil</code> — если ожидаемый тип уже известен: в <code>return</code>, аргументе или сравнении. Если типа нет — <code>nil[T]</code>.</p>
+      </div>
+      <pre><code>fn find(xs: User[], name: str) *User = {
+    for (var i, u in xs) {
+        if (u.Name == name) { return &amp;xs[i]; };
+    };
+    return nil;
+};
+
+var p = nil[*Node];
+if (p == nil) { ... };</code></pre>
+      <p class="muted"><code>nil</code> — только указатели, срезы, map, функции и интерфейсы.</p>
+    </section>
+
+    <section class="card" id="types">
+      <h2><span class="num">03</span> Типы и дженерики</h2>
+      <table>
+        <thead>
+          <tr><th scope="col">Форма</th><th scope="col">Смысл</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>T[]</code> / <code>T[N]</code></td><td>срез / массив на N</td></tr>
+          <tr><td><code>T[U]</code></td><td>generic-применение</td></tr>
+          <tr><td><code>map[K, V]</code></td><td>map</td></tr>
+          <tr><td><code>*T</code></td><td>указатель</td></tr>
+          <tr><td><code>fn(A) R</code></td><td>функция</td></tr>
+          <tr><td><code>fn(A) (R, S)</code></td><td>функция с двумя результатами</td></tr>
+        </tbody>
+      </table>
+      <ul>
+        <li><code>[]</code> — постфиксный и единственный вид скобок: срез, массив, generic.</li>
+        <li><code>T[]</code> связывает крепче <code>*</code>: <code>*T[]</code> — указатель на срез, <code>(*T)[]</code> — срез указателей.</li>
+        <li>Встроенные: <code>bool</code>, <code>i8</code>, <code>i16</code>, <code>i32</code>, <code>i64</code>, <code>u8</code>, <code>u16</code>, <code>u32</code>, <code>u64</code>, <code>int</code>, <code>uint</code>, <code>f32</code>, <code>f64</code>, <code>str</code>, <code>rune</code>, <code>byte</code>, <code>usize</code>, <code>isize</code>, <code>any</code>, <code>error</code>, <code>Duration</code>, <code>Type</code>.</li>
+        <li>Ограничений (constraints) в 0.2 нет: параметр типа ведёт себя как <code>any</code>.</li>
+      </ul>
+      <pre><code>type Stack[Item] = struct {
+    data: Item[],
+
+    fn Push(x: Item) void = {
+        data = append(data, x);
+    };
+};
+
+fn Map[In, Out](xs: In[], f: fn(In) Out) Out[] = {
+    var out = Out[] {};
+    for (var x in xs) {
+        out = append(out, f(x));
+    };
+    return out;
+};
+
+type UserId = u64;
+type Handler = fn(Request) Response or error;</code></pre>
+      <p><b>Интерфейсы</b> — для Go и явных контрактов; реализация структурная, без <code>implements</code> и embedding.</p>
+      <pre><code>type Writer = interface {
+    Write(p: u8[]) int or error;
+};</code></pre>
+    </section>
+
+    <section class="card" id="structs">
+      <h2><span class="num">04</span> Struct, методы, self</h2>
+      <pre><code>type Buffer = struct {
+    data: u8[],
+    name: str,
+
+    fn Write(p: u8[]) int or error = {
+        data = append(data, p...);
+        return len(p);
+    };
+
+    fn Reset() void = {
+        data = u8[] {};
+    };
+};</code></pre>
+      <ul>
+        <li>Поля и методы — внутри тела типа; поля разделяются запятыми.</li>
+        <li><code>self</code> — неявный <code>*T</code>, в сигнатуре не пишется. Поля читаются по имени.</li>
+        <li>Если параметр или локальная переменная перекрывает поле — <code>self.data</code>.</li>
+        <li>Методы всегда с pointer receiver. Методов вне типа, value receiver, embedding и override нет.</li>
+        <li>Создание — <code>var b = Buffer { data = u8[] {} };</code> вызов — <code>b.Write(p) or return;</code></li>
+        <li><code>&amp;T { ... }</code> — heap-аллокация под GC; поля доступны через <code>p.x</code>.</li>
+      </ul>
+    </section>
+
+    <section class="card" id="enums">
+      <h2><span class="num">05</span> Enum, match, type patterns</h2>
+      <pre><code>type Shape = enum {
+    Circle { radius: f64 },
+    Rect { w: f64, h: f64 },
+    Empty,
+};
+
+fn area(s: Shape) f64 = {
+    return match (s) {
+    case Circle { radius } => 3.14159 * radius * radius;
+    case Rect { w, h } => w * h;
+    case Empty => 0.0;
+    };
+};</code></pre>
+      <ul>
+        <li>Варианты: <code>Shape.Circle { radius = 2.0 }</code>, без полей — <code>Shape.Empty</code>.</li>
+        <li><code>match</code> по enum исчерпывающий, без fallthrough. Может быть выражением или statement.</li>
+        <li>Поля варианта связываются по имени: <code>case Circle { radius }</code>. При коллизии имён — <code>case pkg.Circle { ... }</code>.</li>
+      </ul>
+      <p class="label">Type patterns для any</p>
+      <pre><code>fn update(msg: any) void = {
+    match (msg) {
+    case tea.KeyPressMsg as k => {
+        if (k.String() == "q") { return; };
+    };
+    case tea.WindowSizeMsg => { ... };
+    else => { ... };
+    };
+};</code></pre>
+      <ul>
+        <li><code>as k</code> связывает значение с типом; <code>case T</code> — без привязки.</li>
+        <li><code>else</code> — default для открытых типов; <code>case _</code> в <code>match</code> нет. Enum всё равно должен быть исчерпан.</li>
+      </ul>
+    </section>
+
+    <section class="card" id="errors">
+      <h2><span class="num">06</span> Ошибки и defer</h2>
+      <p><code>T or error</code> — ошибка как значение. <code>error</code> — Go-интерфейс.</p>
+      <pre><code>fn read(path: str) u8[] or error = {
+    var f = os.Open(path) or return;
+    defer f.Close();
+    var buf = u8[4096] {};
+    var n = f.Read(buf[:]) or return;
+    return buf[:n];
+};</code></pre>
+      <p class="label">Три формы or</p>
+      <pre><code>var f = os.Open(path) or return;
+
+var data = os.ReadFile(path) or err {
+    fmt.Println("read:", err) or return;
+    return err;
+};
+
+os.Remove(path) or panic("cannot remove");</code></pre>
+      <ul>
+        <li><code>or</code> — только statement-level: целый инициализатор, RHS, expression statement или операнд <code>return</code>. Внутрь выражения не вкладывается.</li>
+        <li><code>or panic()</code> паникует со значением ошибки; <code>or panic("...")</code> — с сообщением.</li>
+      </ul>
+      <p class="label">Списки результатов</p>
+      <pre><code>fn divmod(a: i32, b: i32) i32, i32 = {
+    return a / b, a % b;
+};
+
+var q, r = divmod(7, 2);</code></pre>
+      <ul>
+        <li><code>fn f() A, B or error</code> — форма объявления; ошибка идёт последней.</li>
+        <li>Тип функции с несколькими результатами: <code>fn(i32) (str, bool)</code>.</li>
+        <li>Кортежа-значения нет: результаты раскладываются по именам, а не хранятся как одно значение.</li>
+      </ul>
+      <div class="note teal">
+        <p><b>defer</b> блочный: срабатывает на выходе из ближайшего <code>{}</code>, в том числе через <code>return</code>, <code>break</code>, <code>continue</code>, <code>or return</code> и panic. Внутри <code>par</code> у каждого воркера свой <code>DeferStack</code>.</p>
+        <pre><code>if (cache.Has(key)) {
+    mu.Lock();
+    defer mu.Unlock();
+    ...
+};</code></pre>
+        <p>Ошибка <code>Close</code> значима — закрой явно: <code>f.Close() or return;</code></p>
+      </div>
+    </section>
+
+    <section class="card" id="flow">
+      <h2><span class="num">07</span> Control flow</h2>
+      <pre><code>if (x &gt; 0) {
+    ...
+} else if (x == 0) {
+    ...
+} else {
+    ...
+};
+
+for (var i = 0; i &lt; n; i += 1) { ... };
+for (var x in xs) { ... };
+for (var i, x in xs) { ... };
+for (var k, v in m) { ... };
+for () { ... };</code></pre>
+      <ul>
+        <li>Условия в скобках; после блока-инструкции — <code>;</code>.</li>
+        <li><code>break</code> и <code>continue</code> есть; меток нет. <code>switch</code> нет: <code>if</code> или <code>match</code>.</li>
+        <li><code>match</code> — выражение или statement; по enum исчерпывающий.</li>
+        <li><code>break</code> из <code>match</code>-case пока запрещён — используй <code>return</code> или перестрой цикл.</li>
+      </ul>
+    </section>
+
+    <section class="card" id="concurrency">
+      <h2><span class="num">08</span> Конкурентность</h2>
+      <table>
+        <thead>
+          <tr><th scope="col">Конструкция</th><th scope="col">Что делает</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>par { ... }</code></td><td>независимые операторы, ждёт на <code>}</code></td></tr>
+          <tr><td><code>par for (...) limit N</code></td><td>параллельные итерации, N — ширина</td></tr>
+          <tr><td><code>within D { ... }</code></td><td>дедлайн на блок</td></tr>
+        </tbody>
+      </table>
+      <pre><code>par {
+    users = loadUsers(id) or return;
+    orders = loadOrders(id) or return;
+};
+
+par for (var i = 0; i &lt; len(urls); i += 1) limit 64 {
+    sizes[i] = fetch(urls[i]) or return;
+};
+
+within 30s {
+    par for (var i = 0; i &lt; len(urls); i += 1) limit 64 {
+        sizes[i] = fetch(urls[i]) or return;
+    };
+};</code></pre>
+      <ul>
+        <li><code>par</code> ждёт на <code>}</code>; <code>or return</code>, <code>or panic</code> или паника отменяет остальные. Возвращается ошибка с низшим индексом statement; для <code>par for</code> — с низшим индексом итерации. Для map ord <code>-1</code>: побеждает первая дошедшая ошибка.</li>
+        <li><code>limit N</code> — потолок одновременно выполняемых итераций; по умолчанию <code>GOMAXPROCS</code>.</li>
+        <li><code>within D</code> — дедлайн на блок и всё, что он зовёт; работает без <code>par</code>; вложенность берёт минимальный дедлайн. Внутри воркера дедлайн не меняет соседей. Прерываются только вызовы, которые уважают ctx.</li>
+        <li><code>par</code>: у захваченного корня один писатель, и никакой другой оператор его не читает. <code>par for</code>: писать можно только в слот по индексу итерации (срез/массив) или через <code>sync</code>/<code>atomic</code>. Запись через указатель, в map, в global и в <code>self</code> запрещена.</li>
+        <li><code>defer</code>, <code>within</code> и <code>or panic</code> внутри работают: у каждого воркера свой <code>DeferStack</code> и recovery boundary; паника становится <code>PanicError</code> и отменяет блок.</li>
+        <li><code>return</code>, <code>break</code> и <code>continue</code> не пересекают границу <code>par</code>; наружу — только <code>or return</code>/<code>or panic</code>.</li>
+        <li><code>context</code> в коде нет: компилятор проводит скрытый <code>_s_ctx</code>; Go-функции с <code>context.Context</code> первым параметром получают его сами. На границе Go FFI — сгенерированный non-ctx wrapper.</li>
+        <li>Проверка статическая: алиасы из полей/индексов и function literals не отслеживаются; вызов метода на захваченном интерфейсе считается записью, а указатель/интерфейс в свободной или Go-функции — нет. Динамический оракул — <code>go build -race</code> (G11).</li>
+      </ul>
+    </section>
+
+    <section class="card" id="interop">
+      <h2><span class="num">09</span> Go interop</h2>
+      <ul>
+        <li><code>use</code> тянет Go-пакеты; имена остаются Go-именами.</li>
+        <li>Go-функции с <code>context.Context</code> первым параметром получают скрытый ctx автоматически.</li>
+        <li>Go-функция с <code>(T, bool)</code> — это <code>var v, ok = f();</code> — не <code>or</code>.</li>
+        <li>Интерфейсы структурные: <code>implements</code> не нужен. Sema проверяет method set на присваивании/вызове (G27).</li>
+      </ul>
+      <pre><code>use os;
+
+fn read(path: str) u8[] or error = {
+    var f = os.Open(path) or return;
+    defer f.Close();
+    var buf = u8[4096] {};
+    var n = f.Read(buf[:]) or return;
+    return buf[:n];
+};</code></pre>
+      <p class="label">Bubble Tea v2.1.0</p>
+      <pre><code>use fmt;
+use "charm.land/bubbletea/v2" as tea;
+
+type Model = struct {
+    count: int,
+
+    fn Init() tea.Cmd = { return nil; };
+
+    fn Update(msg: tea.Msg) tea.Model, tea.Cmd = {
+        match (msg) {
+        case tea.KeyPressMsg as k => {
+            if (k.String() == "q") { return self, fn() tea.Msg => tea.Quit(); };
+        };
+        else => {};
+        };
+        return self, nil;
+    };
+
+    fn View() tea.View = { return tea.NewView(fmt.Sprintf("count: %d", count)); };
+};
+
+fn main() void or error = {
+    var p = tea.NewProgram(&amp;Model { count = 0 });
+    p.Run() or return;
+};</code></pre>
+      <p class="muted">0.2: <code>tea.Model</code> реализуется структурно; списки результатов и type patterns снимают блокеры 0.1. Эскиз не проверялся компиляцией.</p>
+    </section>
+
+    <section class="card" id="cli">
+      <h2><span class="num">10</span> CLI</h2>
+      <table>
+        <tbody>
+          <tr><td><code>strizh build [-o out]</code></td><td>перевести <code>.str</code> в Go и собрать бинарник</td></tr>
+          <tr><td><code>strizh run [-- args]</code></td><td>собрать и запустить; аргументы после <code>--</code></td></tr>
+          <tr><td><code>strizh check</code></td><td>parse, sema и typecheck Go без сборки</td></tr>
+          <tr><td><code>strizh test [go test flags]</code></td><td><code>test</code>-блоки через <code>go test</code></td></tr>
+          <tr><td><code>strizh fmt [-w] [paths]</code></td><td>канонический форматтер</td></tr>
+          <tr><td><code>strizh lsp [--root dir]</code></td><td>language server на stdio</td></tr>
+          <tr><td><code>strizh new &lt;dir&gt;</code></td><td>scaffold проекта</td></tr>
+          <tr><td><code>strizh init [dir]</code></td><td>добавить <code>strizh.toml</code></td></tr>
+          <tr><td><code>strizh version</code></td><td>версия</td></tr>
+          <tr><td><code>strizh help</code></td><td>справка</td></tr>
+        </tbody>
+      </table>
+      <p class="label">test-блок</p>
+      <pre><code>test "append grows the slice" {
+    var xs = u8[] {};
+    xs = append(xs, 1);
+    assert_eq(len(xs), 1);
+};</code></pre>
+      <p class="muted"><code>assert</code> и <code>assert_eq</code> — встроенные; в тестах печатают <code>file:line</code>.</p>
+    </section>
+
+    <section class="card" id="limits">
+      <h2><span class="num">11</span> Границы 0.2</h2>
+      <h3>Не делаем</h3>
+      <ul>
+        <li>Нет <code>go</code>, <code>chan</code>, <code>select</code>, <code>async</code>, <code>await</code>, <code>Promise</code>: конкурентность только блоками.</li>
+        <li>Нет исключений: <code>try</code>/<code>catch</code>/<code>?</code>/<code>!</code>; ошибки — <code>T or error</code>.</li>
+        <li>Нет <code>:=</code>, <code>let</code>, <code>export</code>, атрибутов, <code>switch</code>, меток, UFCS, методов вне типа, embedding, перегрузки операторов.</li>
+        <li>Нет <code>context</code> в прикладном коде, <code>unsafe</code>, арен, RC/ORC, трейтов и lifetimes.</li>
+        <li>Нет tuple-значений: только списки результатов; результат нельзя хранить как одно значение.</li>
+        <li>Инфраструктуру — прокси, драйверы, брокеры — не пишем; берём из Go.</li>
+      </ul>
+      <h3>Ещё не в 0.2</h3>
+      <ul>
+        <li>Нет generic constraints и generic enum; параметр типа ведёт себя как <code>any</code>.</li>
+        <li>Нет локальных именованных функций — только function literals.</li>
+        <li>Нет variadic-объявлений (<code>fn f(xs: T...)</code>); Go-variadics вызывать можно.</li>
+        <li><code>case _</code> нет — <code>else</code>; <code>break</code> из <code>match</code>-case — ошибка.</li>
+        <li><code>or</code> только statement-level; вложить в выражение нельзя.</li>
+        <li>Typecheck Go работает в <code>strizh check</code> и LSP на open/save; async/debounce (G43), колонки (G34) и тестовые пакеты — ещё нет.</li>
+        <li><code>par</code>-проверки статические: map-записи запрещены всегда, алиасы из полей/индексов не отслеживаются; динамический оракул — <code>go build -race</code> (G11).</li>
+        <li>Method sets проверяются для Strizh/Go интерфейсов; generics, enum-варианты, массивы, function values и variadic остаются на <code>go build</code> (G27).</li>
+        <li>Strizh-функция или метод со скрытым ctx получает публичный wrapper на Go-границе; дедлайн не переносится через function value или пакет.</li>
+      </ul>
+      <p class="muted">0.2 — preview, не 1.0. Полный список: <a href="../../design/GAPS.md"><code>design/GAPS.md</code></a>.</p>
+    </section>
+
+  </main>
+
+  <footer class="foot">
+    <span>Strizh 0.2 · printable cheat sheet</span>
+    <span><a href="index.html">index.html</a> · <a href="internals.html">internals.html</a> · <a href="../../design/SPEC.md">SPEC.md</a></span>
+  </footer>
+
+</div>
+</body>
+</html>

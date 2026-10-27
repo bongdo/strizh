@@ -1,0 +1,52 @@
+{
+  "name": "strizh",
+  "displayName": "Strizh",
+  "description": "Strizh language support",
+  "version": "0.1.0",
+  "publisher": "bongdo",
+  "private": true,
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": ["Programming Languages"],
+  "main": "./out/extension.js",
+  "activationEvents": ["onLanguage:strizh"],
+  "contributes": {
+    "languages": [
+      {
+        "id": "strizh",
+        "aliases": ["Strizh", "strizh"],
+        "extensions": [".str"],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "strizh",
+        "scopeName": "source.strizh",
+        "path": "./syntaxes/strizh.tmLanguage.json"
+      }
+    ],
+    "configuration": {
+      "title": "Strizh",
+      "properties": {
+        "strizh.serverPath": {
+          "type": "string",
+          "default": "strizh",
+          "description": "Path to the strizh executable used as the language server."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p .",
+    "watch": "tsc -w -p ."
+  },
+  "dependencies": {
+    "vscode-languageclient": "^9.0.1"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.85.0",
+    "typescript": "^5.5.0"
+  }
+}

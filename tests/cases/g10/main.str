@@ -1,0 +1,50 @@
+use fmt;
+use sort;
+
+var xs = i32[] {3, 1, 2};
+
+fn less(i: int, j: int) bool = {
+    var dummy = i32[1] {};
+    par {
+        dummy[0] = 0;
+    };
+    return xs[i] < xs[j];
+};
+
+type Doubler = struct {
+    n: i32,
+
+    fn Double() i32 = {
+        var out = i32[1] {};
+        par {
+            out[0] = n * 2;
+        };
+        return out[0];
+    };
+};
+
+type Stringer = struct {
+    fn String() str = {
+        var out = u8[1] {};
+        par {
+            out[0] = 1;
+        };
+        return "stringer";
+    };
+};
+
+type Doer = interface {
+    Double() i32;
+};
+
+fn apply(d: Doer) i32 = {
+    return d.Double();
+};
+
+fn main() void = {
+    sort.Slice(xs, less);
+    fmt.Println(xs);
+    var d = Doubler { n = 21 };
+    fmt.Println(apply(&d));
+    fmt.Println(&Stringer {});
+};

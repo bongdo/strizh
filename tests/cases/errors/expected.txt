@@ -1,0 +1,4 @@
+42
+caught: boom
+0
+42

@@ -1,0 +1,4 @@
+zero
+small
+big
+read

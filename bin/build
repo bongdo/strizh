@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+set -euo pipefail
+cd "$(dirname "$0")/.."
+export GOFLAGS="${GOFLAGS:-} -buildvcs=false"
+go build -o bin/strizh ./cmd/strizh
