@@ -113,7 +113,11 @@ Compiler internals are in [`design/IMPL.md`](design/IMPL.md).
 Highlights:
 
 - `var x = value;`, `const Name = value;`, no `:=`.
-- `fn name(a: T) R = { ... };`, errors as `T or error`, propagation with `or`.
+- `use fmt;` for simple Go imports; quoted paths only for `net/http`, `charm.land/...` and local `./lib`.
+- comments are `//` only; block comments are rejected.
+- `fn name(a: T) R = { ... };`, errors as `T or error`, propagation with `or return`;
+  manual `if err != nil { return err; }` is rejected.
+- struct literals use named fields only.
 - multiple results: `fn f() A, B or error`, `var a, b = f();`.
 - `type Name = struct { ... }`, fields and methods inside the body, implicit `self`.
 - `type Shape = enum { Circle { radius: f64 }, Empty, };` with exhaustive `match`.
