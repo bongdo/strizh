@@ -48,9 +48,9 @@ executable if it is not on `PATH`.
 ## Features
 
 - diagnostics from parsing and Strizh checks
-- hover with types and signatures
-- go-to-definition for local, package and cross-file symbols
-- completion for keywords, builtins, locals and package members
+- basic hover with types and signatures
+- go-to-definition for local, package and cross-file symbols where the symbol is resolved
+- basic completion for keywords, builtins, locals and package members; struct fields and Go selectors are limited
 - document symbols
 - signature help
 - document formatting
