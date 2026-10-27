@@ -29,7 +29,7 @@ module = "example.com/hello"
 ## 2. Lexical rules
 
 - `;` ends every statement and every block used as a statement.
-- Comments: `// ...` and `/* ... */`.
+- Comments: `// ...` only; block comments are rejected with a diagnostic.
 - Identifiers: Unicode letters, digits, `_`; the first character is a letter or
   `_`. Names beginning with `_s_` are reserved for codegen.
 - Visibility is by the first letter, exactly as in Go: `User` is public,
