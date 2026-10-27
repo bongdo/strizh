@@ -1044,29 +1044,36 @@ func TestSpecExample(t *testing.T) {
 }
 
 func TestComments(t *testing.T) {
-	src := "// head\nuse fmt; /* mid */\nfn f() void = {\n    // body\n};\n"
+	src := "// head\nuse fmt; // mid\nfn f() void = {\n    // body\n};\n"
 	f := mustParse(t, src)
 	checkSpans(t, f)
 
 	if len(f.Comments) != 3 {
 		t.Fatalf("comments = %d, want 3", len(f.Comments))
 	}
-	want := []struct {
-		text  string
-		block bool
-	}{
-		{"// head", false},
-		{"/* mid */", true},
-		{"// body", false},
-	}
+	want := []string{"// head", "// mid", "// body"}
 	for i, w := range want {
 		c := f.Comments[i]
-		if c.Text != w.text || c.Block != w.block {
+		if c.Text != w || c.Block {
 			t.Errorf("comment %d = %+v", i, c)
 		}
 		if i > 0 && c.Pos().Offset < f.Comments[i-1].Pos().Offset {
 			t.Errorf("comment %d out of order", i)
 		}
+	}
+}
+
+func TestBlockCommentRejected(t *testing.T) {
+	src := "// head\nuse fmt; /* mid */\nfn f() void = {\n};\n"
+	f, errs := Parse("block.str", []byte(src))
+	if len(errs) != 1 {
+		t.Fatalf("errors = %v", errs)
+	}
+	if errs[0].Msg != "block comments are not supported; use //" {
+		t.Fatalf("error = %q", errs[0].Msg)
+	}
+	if len(f.Comments) != 1 || f.Comments[0].Text != "// head" {
+		t.Fatalf("comments = %+v", f.Comments)
 	}
 }
 
