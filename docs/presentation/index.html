@@ -1214,8 +1214,8 @@
                 </article>
                 <article class="card">
                     <span class="num">03</span>
-                    <h3>Go — напрямую</h3>
-                    <p>Тот же <code>use</code>, те же Go-типы и интерфейсы. Никакого отдельного FFI-слоя и ручных адаптеров.</p>
+                    <h3>Go — через границу</h3>
+                    <p>Тот же <code>use</code>, но Go-типы не протекают в app API. Сложные библиотеки — через тонкий Strizh-фасад; raw Go — escape hatch.</p>
                 </article>
             </div>
             <p class="callout">В прикладном коде нет видимого <code>context</code>. Нет «цвета функций». Нет <code>unsafe</code>.</p>
@@ -1254,8 +1254,8 @@
                 </article>
                 <article class="principle">
                     <span class="num">06</span>
-                    <h3>FFI без адаптеров</h3>
-                    <p>Go-имена остаются Go-именами. <code>use</code> и есть граница.</p>
+                    <h3>FFI с тонким фасадом</h3>
+                    <p>Go остаётся Go. App-код видит Strizh API; адаптер живёт на границе, а не в каждом вызове.</p>
                 </article>
             </div>
             <p class="callout teal">Цель — не заменить Go. Цель — убрать из прикладного кода всё, что не является задачей.</p>
