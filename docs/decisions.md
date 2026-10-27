@@ -81,3 +81,28 @@ demo that cannot build.
 **Что отвергли:** a mechanical 12k-line UI translation, Bubble Tea, and a
 JavaScript-only editor.
 **Цена:** no AI/ghost text, soft wrap, system clipboard or full LSP UI yet.
+
+## 2026-10-27 — One canonical way per intent; Go is a foreign layer
+
+**Контекст:** Go interop leaked method sets, context wrappers, Go types and
+feature-parity work into the language surface. That creates the same
+"many ways to do it" problem Go itself is criticized for.
+**Решение:** app code has one canonical form per intent; Go is a foreign/FFI
+layer. Complex Go libraries go through Strizh facades or adapters; raw Go is an
+escape hatch. Simple imports are bare (`use fmt;`), struct literals are named,
+propagation is `or return`, comments are `//` only.
+**Почему:** external libraries stay available, while app code remains small.
+**Что отвергли:** Go feature parity (full generics constraints, generic enums,
+expression-level `or`, user variadics, doc comments, full IDE features) and
+hidden context across arbitrary Go callbacks.
+**Цена:** binding/facade code for complex libraries; some Go APIs are not
+directly usable from app code.
+
+## 2026-10-27 — `strizh check` checks project tests
+
+**Контекст:** a type error in a `test` block was only caught by `go test`.
+**Решение:** `strizh check` generates `zz_strizh_test.go` in memory and enables
+`packages.Config.Tests`; LSP stays production-only for now.
+**Почему:** `check` should validate the whole project before build/run.
+**Что отвергли:** a separate `check --tests` switch; tests are part of validity.
+**Цена:** cold `strizh check` is slower because it runs `go list -test`.
