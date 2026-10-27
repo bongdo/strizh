@@ -413,9 +413,9 @@ flow. См. §10 в [SPEC.md](SPEC.md).
 
 | Правило | Статус | Где |
 |---|---|---|
-| `use fmt;`, кавычки только для `/`/`.`/local | canonical | formatter; sema для alias `/v2` |
+| `use fmt;`, кавычки только для `/`/`.`/local | canonical | parser: quoted simple — error; formatter canonical |
 | named struct literals | forbidden (positional) | sema, уже есть |
-| `or` вместо `if err != nil` в app | canonical | review + FFI-правило; multi-result — только адаптер |
+| `or` вместо `if err != nil { return err }` в app | canonical | sema: pure propagation — error; inspection allowed |
 | range/C-style/`for ()` по намерению | canonical | review; lint на C-style по slice, если range хватает |
 | `par`/`par for`/`within` по намерению | canonical | sema для unsafe `par`; lint на `par` с одним statement |
 | bare `nil` при известном типе | canonical | warning + autofix, не error |
@@ -424,7 +424,7 @@ flow. См. §10 в [SPEC.md](SPEC.md).
 | `match` с одним `else` | anti-pattern | lint |
 | `if`-цепочка по enum | anti-pattern | lint, если можно доказать |
 | map в `par for` | forbidden (target) | sema; сейчас разрешён с ord `-1` |
-| `/* */` | forbidden (target) | lexer; уже error |
+| `/* */` | forbidden | lexer: error |
 | doc comments | absent | комментарии не привязаны к символам |
 | Go-типы в публичном API | forbidden | review + FFI; линтер по сигнатурам — позже |
 
