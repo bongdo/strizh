@@ -330,20 +330,16 @@ func (l *lexer) lineComment() {
 }
 
 func (l *lexer) blockComment() {
-	start, off := l.pos(), l.i
+	start := l.pos()
 	l.advanceN(2)
-	for {
-		if l.i >= len(l.src) {
-			l.errors = append(l.errors, Error{Pos: start, Msg: "unterminated block comment"})
-			break
-		}
+	for l.i < len(l.src) {
 		if l.src[l.i] == '*' && l.peek(1) == '/' {
 			l.advanceN(2)
 			break
 		}
 		l.advance()
 	}
-	l.comments = append(l.comments, Comment{Pos: start, End: l.pos(), Text: string(l.src[off:l.i]), Block: true})
+	l.errors = append(l.errors, Error{Pos: start, Msg: "block comments are not supported; use //"})
 }
 
 func (l *lexer) symbol() {

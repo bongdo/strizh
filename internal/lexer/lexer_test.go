@@ -361,7 +361,7 @@ func TestUnterminatedRawString(t *testing.T) {
 }
 
 func TestComments(t *testing.T) {
-	src := "// line\nx /* block\ncomment */ y"
+	src := "// line\nx // second\n y"
 	toks, comments, errs := mustLex(t, src)
 	if len(errs) != 0 {
 		t.Fatalf("unexpected errors: %v", errs)
@@ -382,34 +382,37 @@ func TestComments(t *testing.T) {
 	if comments[0].End != (token.Pos{Offset: 7, Line: 1, Col: 8}) {
 		t.Fatalf("comment 0 End = %+v", comments[0].End)
 	}
-	if comments[1].Text != "/* block\ncomment */" || !comments[1].Block {
+	if comments[1].Text != "// second" || comments[1].Block {
 		t.Fatalf("comment 1 = %+v", comments[1])
-	}
-	if comments[1].Pos != (token.Pos{Offset: 10, Line: 2, Col: 3}) {
-		t.Fatalf("comment 1 Pos = %+v", comments[1].Pos)
-	}
-	if comments[1].End != (token.Pos{Offset: 29, Line: 3, Col: 11}) {
-		t.Fatalf("comment 1 End = %+v", comments[1].End)
 	}
 }
 
-func TestUnterminatedBlockComment(t *testing.T) {
-	toks, comments, errs := mustLex(t, "x /* foo")
-	wantKinds(t, toks, []token.Kind{token.Ident, token.EOF})
-	if len(errs) != 1 {
-		t.Fatalf("got %d errors, want 1", len(errs))
+func TestBlockCommentRejected(t *testing.T) {
+	cases := []struct {
+		name string
+		src  string
+		want []token.Kind
+	}{
+		{"terminated", "x /* block\ncomment */ y", []token.Kind{token.Ident, token.Ident, token.EOF}},
+		{"unterminated", "x /* foo", []token.Kind{token.Ident, token.EOF}},
 	}
-	if errs[0].Pos != (token.Pos{Offset: 2, Line: 1, Col: 3}) {
-		t.Fatalf("error Pos = %+v", errs[0].Pos)
-	}
-	if !strings.Contains(errs[0].Msg, "unterminated block comment") {
-		t.Fatalf("error Msg = %q", errs[0].Msg)
-	}
-	if len(comments) != 1 || !comments[0].Block || comments[0].Text != "/* foo" {
-		t.Fatalf("comments = %+v", comments)
-	}
-	if comments[0].End != (token.Pos{Offset: 8, Line: 1, Col: 9}) {
-		t.Fatalf("comment End = %+v", comments[0].End)
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			toks, comments, errs := mustLex(t, tc.src)
+			wantKinds(t, toks, tc.want)
+			if len(errs) != 1 {
+				t.Fatalf("got %d errors, want 1: %v", len(errs), errs)
+			}
+			if errs[0].Pos != (token.Pos{Offset: 2, Line: 1, Col: 3}) {
+				t.Fatalf("error Pos = %+v", errs[0].Pos)
+			}
+			if errs[0].Msg != "block comments are not supported; use //" {
+				t.Fatalf("error Msg = %q", errs[0].Msg)
+			}
+			if len(comments) != 0 {
+				t.Fatalf("comments = %+v", comments)
+			}
+		})
 	}
 }
 

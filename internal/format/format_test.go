@@ -103,6 +103,42 @@ func TestRoundTrip(t *testing.T) {
 	}
 }
 
+func TestLineCommentsPreserved(t *testing.T) {
+	src := `// head
+use fmt;
+
+fn main() void = {
+    // body
+    var x = 1; // tail
+    _ = x;
+};
+`
+	f, errs := parser.Parse("comments.str", []byte(src))
+	if len(errs) > 0 {
+		t.Fatalf("parse: %v", errs)
+	}
+	out := string(File(f))
+	for _, want := range []string{"// head", "// body", "// tail"} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("missing %q in:\n%s", want, out)
+		}
+	}
+	f2, errs := parser.Parse("comments.str", []byte(out))
+	if len(errs) > 0 {
+		t.Fatalf("parse formatted: %v\n---\n%s", errs, out)
+	}
+	if out2 := string(File(f2)); out2 != out {
+		t.Fatalf("not idempotent:\n--- first ---\n%s\n--- second ---\n%s", out, out2)
+	}
+}
+
+func TestBlockCommentDiagnostic(t *testing.T) {
+	_, errs := parser.Parse("block.str", []byte("fn main() void = {\n    /* nope */\n};\n"))
+	if len(errs) != 1 || errs[0].Msg != "block comments are not supported; use //" {
+		t.Fatalf("errors = %v", errs)
+	}
+}
+
 func TestNewSyntax(t *testing.T) {
 	src := `fn pair() i32, i32 or error = {
     return 1, 2;
