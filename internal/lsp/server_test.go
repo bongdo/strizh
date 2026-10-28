@@ -256,7 +256,7 @@ func TestInitializeCapabilities(t *testing.T) {
 	if caps.SignatureHelpProvider == nil || !hasString(caps.SignatureHelpProvider.TriggerCharacters, "(") || !hasString(caps.SignatureHelpProvider.TriggerCharacters, ",") {
 		t.Fatalf("signature help provider: %+v", caps.SignatureHelpProvider)
 	}
-	if result.ServerInfo.Name != "strizh" || result.ServerInfo.Version != "0.1.0" {
+	if result.ServerInfo.Name != "strizh" || result.ServerInfo.Version != "0.2.0" {
 		t.Fatalf("server info: %+v", result.ServerInfo)
 	}
 	diags := c.waitDiagnostics(uri, func(*PublishDiagnosticsParams) bool { return true })

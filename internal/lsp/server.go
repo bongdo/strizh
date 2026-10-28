@@ -27,7 +27,7 @@ import (
 
 const (
 	serverName           = "strizh"
-	serverVersion        = "0.1.0"
+	serverVersion        = "0.2.0"
 	textDocumentSyncFull = 1
 )
 
