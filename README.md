@@ -28,7 +28,7 @@ fn main() void or error = {
 Requires Go 1.27+.
 
 ```sh
-go install github.com/bongdo/strizh/cmd/strizh@latest
+go install github.com/bongdo/strizh/cmd/strizh@v0.2.0
 ```
 
 From a checkout:
