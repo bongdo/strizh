@@ -3,6 +3,8 @@
 Strizh is a small application language with Go's runtime and ecosystem:
 Go-speed binaries, Hare-like syntax, sum types, and structured parallelism.
 
+![Strizh syntax](docs/screenshots/syntax.png)
+
 ```hare
 use fmt;
 
@@ -22,6 +24,14 @@ fn main() void or error = {
 ```
 
 ## Install
+
+Requires Go 1.27+.
+
+```sh
+go install github.com/bongdo/strizh/cmd/strizh@latest
+```
+
+From a checkout:
 
 ```sh
 ./bin/build
@@ -133,11 +143,19 @@ Highlights:
 `docs/presentation/index.html` — обзор языка, синтаксиса, Bubble Tea и внутренней
 кухни. Рядом: `internals.html` (компилятор) и `cheatsheet.html` (шпаргалка).
 
-## Editor support
+## Editor support (LSP)
 
-LSP diagnostics and basic editing support:
+The language server runs over stdio:
 
-- Neovim: see [`docs/lsp.md`](docs/lsp.md).
+```sh
+strizh lsp
+```
+
+It provides diagnostics, hover, go-to-definition, completion, document symbols,
+signature help and formatting. `strizh check` remains the source of truth for
+the whole project; the LSP is an editing convenience.
+
+- Neovim: copy the `vim.lsp.start` setup from [`docs/lsp.md`](docs/lsp.md).
 - VS Code: [`editors/vscode`](editors/vscode) has a TextMate grammar and a
   language client. Run `npm install && npm run compile` inside it.
 - Any editor with an LSP client can use `strizh lsp`.
@@ -155,3 +173,7 @@ bin/run help  # run the compiler from source
 
 Conformance programs live in [`tests/cases`](tests/cases). Each case has a
 `strizh.toml`, a `main.str`, and an `expected.txt`.
+
+## License
+
+MIT. See [LICENSE](LICENSE).
